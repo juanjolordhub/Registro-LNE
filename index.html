@@ -234,6 +234,19 @@ tr:hover td{background:var(--surf3);}
 .toolbar-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
 .toolbar-row h3{font-size:15px;font-weight:800;flex:1;}
 
+
+/* MANAGE COURSES MODAL */
+.course-toggle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;}
+.course-toggle{display:flex;align-items:center;gap:10px;background:var(--surf2);border:1.5px solid var(--border);border-radius:9px;padding:10px 12px;cursor:pointer;transition:all .15s;user-select:none;}
+.course-toggle:hover{border-color:var(--accent);background:var(--accent-l);}
+.course-toggle.ct-on{border-color:var(--accent);background:var(--accent-l);}
+.ct-chk{width:20px;height:20px;border-radius:5px;border:2px solid var(--border2);background:var(--surf);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.course-toggle.ct-on .ct-chk{background:var(--accent);border-color:var(--accent);}
+.ct-chk svg{width:12px;height:12px;fill:white;display:none;}
+.course-toggle.ct-on .ct-chk svg{display:block;}
+.ct-lbl{font-size:13px;font-weight:700;color:var(--text);}
+.ct-short{font-size:10px;color:var(--text3);margin-top:1px;}
+
 @media(max-width:700px){
   .form-row{grid-template-columns:1fr 1fr;}
   .ctx-row{gap:8px;}
@@ -293,7 +306,11 @@ tr:hover td{background:var(--surf3);}
 <div id="app">
   <!-- TOPBAR -->
   <div class="topbar">
-    <span class="tb-brand">🏫 Nueva Esperanza</span>
+    <div id="tb-logo-wrap" onclick="openLogoModal()" title="Cambiar logo" style="width:36px;height:36px;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+      <img id="tb-logo-img" src="" alt="" style="width:100%;height:100%;object-fit:contain;display:none;">
+      <svg id="tb-logo-ph" width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,.55)"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+    </div>
+    <span class="tb-brand" id="tb-brand">🏫 Nueva Esperanza</span>
     <div class="tb-sep"></div>
     <span class="tb-ctx" id="tb-ctx">CNB 2026</span>
     <div class="tb-right">
@@ -348,7 +365,13 @@ tr:hover td{background:var(--surf3);}
         <input id="sel-nalum" type="number" min="1" max="45" value="28" style="width:60px;" onchange="onAlumChange()">
       </div>
     </div>
-    <div class="sec-title" style="font-size:12px;color:var(--text2);margin-bottom:8px;">Selecciona el curso que impartes:</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="sec-title" style="font-size:12px;color:var(--text2);margin-bottom:0;">Selecciona el curso que impartes:</div>
+      <button onclick="openManageCoursesModal()" style="padding:4px 12px;background:var(--surf);border:1.5px solid var(--border2);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text2);display:flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        Gestionar mis cursos
+      </button>
+    </div>
     <div class="course-chips" id="course-chips"></div>
     <div id="save-bar-wrap"></div>
     <div class="stats-row" id="stats-row"></div>
@@ -438,6 +461,46 @@ tr:hover td{background:var(--surf3);}
     </div>
   </div>
 </div>
+
+<!-- MANAGE COURSES MODAL -->
+<div class="overlay" id="manage-overlay">
+  <div class="modal" style="width:680px;max-width:96vw;">
+    <h3>⚙️ Mis cursos — mostrar / ocultar</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Activa solo los cursos que impartes. El sistema recordará tu selección cada vez que ingreses.</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button onclick="toggleAllManage(true)" style="padding:5px 12px;background:var(--accent-l);border:1.5px solid var(--accent);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;color:var(--accent);font-family:'Plus Jakarta Sans',sans-serif;">✓ Activar todos</button>
+      <button onclick="toggleAllManage(false)" style="padding:5px 12px;background:var(--surf2);border:1.5px solid var(--border2);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;color:var(--text2);font-family:'Plus Jakarta Sans',sans-serif;">✕ Ocultar todos</button>
+    </div>
+    <div class="course-toggle-grid" id="manage-course-grid"></div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeManageCoursesModal()">Cancelar</button>
+      <button class="btn-save" onclick="applyManageCourses()">Aplicar y guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGO MODAL -->
+<div class="overlay" id="logo-overlay">
+  <div class="modal" style="max-width:380px;">
+    <h3>Logo de la institución</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px;">El logo aparece en el encabezado y en los reportes PDF. Solo el Director puede cambiarlo.</p>
+    <div id="logo-preview-wrap" style="width:100%;height:140px;border:2px dashed var(--border2);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden;background:var(--surf2);">
+      <img id="logo-preview-big" src="" alt="" style="max-width:100%;max-height:140px;object-fit:contain;display:none;">
+      <span id="logo-preview-ph" style="font-size:12px;color:var(--text3);">Sin logo cargado</span>
+    </div>
+    <input type="file" id="logo-file-input" accept="image/*" style="display:none;" onchange="onLogoFile(this)">
+    <div style="display:flex;gap:8px;margin-bottom:4px;">
+      <button class="btn-save" style="flex:1;" onclick="document.getElementById('logo-file-input').click()">📁 Seleccionar imagen</button>
+      <button class="btn-cancel" onclick="removeLogo()" id="btn-remove-logo" style="display:none;">Quitar logo</button>
+    </div>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:14px;">Formatos: JPG, PNG, SVG. Máximo 500 KB recomendado.</p>
+    <div class="modal-foot" style="margin-top:0;">
+      <button class="btn-cancel" onclick="closeLogoModal()">Cancelar</button>
+      <button class="btn-save" onclick="saveLogo()" id="btn-save-logo" disabled>Guardar logo</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 // ══════════════════════════════════════════
@@ -537,6 +600,99 @@ function setSyncState(state,msg){
 }
 
 // ══════════════════════════════════════════
+//  LOGO — subir, guardar y cargar
+// ══════════════════════════════════════════
+let pendingLogoB64 = null;
+
+function openLogoModal(){
+  if(!currentUser || currentUser.rol !== 'director'){
+    toast('Solo el Director puede cambiar el logo','warn'); return;
+  }
+  // reset pending
+  pendingLogoB64 = null;
+  document.getElementById('btn-save-logo').disabled = true;
+  // load current logo into preview if exists
+  const src = document.getElementById('tb-logo-img').src;
+  const bigImg = document.getElementById('logo-preview-big');
+  const bigPh  = document.getElementById('logo-preview-ph');
+  if(src && src.startsWith('data:')){
+    bigImg.src=src; bigImg.style.display='block'; bigPh.style.display='none';
+    document.getElementById('btn-remove-logo').style.display='inline-block';
+  } else {
+    bigImg.style.display='none'; bigPh.style.display='block';
+    document.getElementById('btn-remove-logo').style.display='none';
+  }
+  document.getElementById('logo-overlay').classList.add('open');
+}
+function closeLogoModal(){
+  pendingLogoB64 = null;
+  document.getElementById('logo-overlay').classList.remove('open');
+}
+
+function onLogoFile(inp){
+  const file = inp.files[0]; if(!file) return;
+  if(file.size > 800000){ toast('La imagen es muy grande. Usa una menor a 500 KB.','warn'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    pendingLogoB64 = e.target.result;
+    const img = document.getElementById('logo-preview-big');
+    const ph  = document.getElementById('logo-preview-ph');
+    img.src = pendingLogoB64; img.style.display='block'; ph.style.display='none';
+    document.getElementById('btn-save-logo').disabled = false;
+    document.getElementById('btn-remove-logo').style.display='inline-block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveLogo(){
+  if(!pendingLogoB64){ toast('Selecciona una imagen primero','warn'); return; }
+  try{
+    await db.from('configuracion').upsert({id:'logo', valor: pendingLogoB64, updated_at: new Date().toISOString()});
+    applyLogo(pendingLogoB64);
+    toast('Logo guardado correctamente','ok');
+    closeLogoModal();
+  }catch(e){ toast('Error al guardar logo: '+e.message,'err'); }
+}
+
+async function removeLogo(){
+  if(!confirm('¿Quitar el logo de la institución?')) return;
+  try{
+    await db.from('configuracion').delete().eq('id','logo');
+    clearLogoUI();
+    toast('Logo eliminado','ok');
+    closeLogoModal();
+  }catch(e){ toast('Error al eliminar logo','err'); }
+}
+
+function applyLogo(src){
+  // Topbar
+  const img = document.getElementById('tb-logo-img');
+  const ph  = document.getElementById('tb-logo-ph');
+  img.src = src; img.style.display='block'; ph.style.display='none';
+  // Modal preview
+  const bigImg = document.getElementById('logo-preview-big');
+  const bigPh  = document.getElementById('logo-preview-ph');
+  if(bigImg){ bigImg.src=src; bigImg.style.display='block'; }
+  if(bigPh)  bigPh.style.display='none';
+  const btnRemove = document.getElementById('btn-remove-logo');
+  if(btnRemove) btnRemove.style.display='inline-block';
+}
+
+function clearLogoUI(){
+  const img = document.getElementById('tb-logo-img');
+  const ph  = document.getElementById('tb-logo-ph');
+  img.style.display='none'; img.src=''; ph.style.display='block';
+}
+
+async function loadLogo(){
+  try{
+    const {data} = await db.from('configuracion').select('valor').eq('id','logo').maybeSingle();
+    if(data && data.valor) applyLogo(data.valor);
+  }catch(e){}
+}
+
+
+// ══════════════════════════════════════════
 //  INIT — verificar si existe director
 // ══════════════════════════════════════════
 async function init(){
@@ -621,12 +777,15 @@ function showApp(){
   document.getElementById('user-role').textContent=currentUser.rol==='director'?'Director':'Docente';
   buildNav();
   showView('notas');
-  renderCourseChips();
-  loadGrades();
+  loadUserCourses().then(()=>{ renderCourseChips(); loadGrades(); });
   if(currentUser.rol==='director'){
     loadDocentesPanel();
   }
   setSyncState('ok','conectado');
+  loadLogo();
+  // Only director can change logo
+  const logoWrap = document.getElementById('tb-logo-wrap');
+  if(logoWrap) logoWrap.style.cursor = currentUser.rol==='director' ? 'pointer' : 'default';
 }
 
 function buildNav(){
@@ -674,10 +833,78 @@ function onAlumChange(){
 // ══════════════════════════════════════════
 //  COURSE CHIPS
 // ══════════════════════════════════════════
+// visible courses per user (loaded from supabase configuracion)
+let visibleCourseIds = COURSES.map(c=>c.id); // default: all visible
+let tempManageIds = [];
+
 function renderCourseChips(){
-  document.getElementById('course-chips').innerHTML=COURSES.map(c=>
+  const visible = COURSES.filter(c => visibleCourseIds.includes(c.id));
+  if(!visible.length){
+    document.getElementById('course-chips').innerHTML =
+      '<span style="font-size:12px;color:var(--text3);font-style:italic;">No tienes cursos activos. Haz clic en "Gestionar mis cursos" para activar.</span>';
+    return;
+  }
+  document.getElementById('course-chips').innerHTML = visible.map(c=>
     `<button class="chip ${c.id===activeCourse?'on':''}" onclick="changeCourse('${c.id}')">${c.label}</button>`
   ).join('');
+}
+
+// ── Manage courses modal ──
+function openManageCoursesModal(){
+  tempManageIds = [...visibleCourseIds];
+  const grid = document.getElementById('manage-course-grid');
+  grid.innerHTML = COURSES.map(c => {
+    const on = tempManageIds.includes(c.id);
+    return `<div class="course-toggle ${on?'ct-on':''}" id="ctog-${c.id}" onclick="toggleManageCourse('${c.id}')">
+      <div class="ct-chk"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+      <div><div class="ct-lbl">${c.label}</div><div class="ct-short">${c.short}</div></div>
+    </div>`;
+  }).join('');
+  document.getElementById('manage-overlay').classList.add('open');
+}
+function closeManageCoursesModal(){
+  document.getElementById('manage-overlay').classList.remove('open');
+}
+function toggleManageCourse(id){
+  const idx = tempManageIds.indexOf(id);
+  if(idx>=0) tempManageIds.splice(idx,1);
+  else tempManageIds.push(id);
+  // keep original order
+  tempManageIds.sort((a,b)=>COURSES.findIndex(c=>c.id===a)-COURSES.findIndex(c=>c.id===b));
+  const el = document.getElementById('ctog-'+id);
+  if(el) el.classList.toggle('ct-on', tempManageIds.includes(id));
+}
+function toggleAllManage(on){
+  tempManageIds = on ? COURSES.map(c=>c.id) : [];
+  COURSES.forEach(c=>{
+    const el=document.getElementById('ctog-'+c.id);
+    if(el) el.classList.toggle('ct-on', on);
+  });
+}
+async function applyManageCourses(){
+  if(!tempManageIds.length){ alert('Debes tener al menos 1 curso activo.'); return; }
+  visibleCourseIds = [...tempManageIds];
+  // ensure activeCourse is still visible
+  if(!visibleCourseIds.includes(activeCourse)) activeCourse = visibleCourseIds[0];
+  // save preference to supabase per user
+  const key = 'courses_' + currentUser.id;
+  try{
+    await db.from('configuracion').upsert({id: key, valor: JSON.stringify(visibleCourseIds), updated_at: new Date().toISOString()});
+  }catch(e){}
+  closeManageCoursesModal();
+  renderCourseChips();
+  loadGrades();
+}
+async function loadUserCourses(){
+  if(!currentUser) return;
+  const key = 'courses_' + currentUser.id;
+  try{
+    const {data} = await db.from('configuracion').select('valor').eq('id', key).maybeSingle();
+    if(data && data.valor){
+      const saved = JSON.parse(data.valor);
+      if(saved && saved.length) visibleCourseIds = saved;
+    }
+  }catch(e){}
 }
 async function changeCourse(id){
   activeCourse=id;
@@ -1102,6 +1329,82 @@ function exportDashExcel(){
   XLSX.utils.book_append_sheet(wb,ws,'Dashboard');
   XLSX.writeFile(wb,'NuevaEsperanza_Dashboard_CNB2026.xlsx');
 }
+
+// ══════════════════════════════════════════
+//  LOGO — subir, guardar y cargar
+// ══════════════════════════════════════════
+let pendingLogoB64 = null;
+
+function openLogoModal(){
+  document.getElementById('logo-overlay').classList.add('open');
+}
+function closeLogoModal(){
+  pendingLogoB64 = null;
+  document.getElementById('logo-overlay').classList.remove('open');
+}
+
+function onLogoFile(inp){
+  const file = inp.files[0]; if(!file) return;
+  if(file.size > 800000){ toast('La imagen es muy grande. Usa una menor a 500 KB.','warn'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    pendingLogoB64 = e.target.result;
+    const img = document.getElementById('logo-preview-big');
+    const ph  = document.getElementById('logo-preview-ph');
+    img.src = pendingLogoB64; img.style.display='block'; ph.style.display='none';
+    document.getElementById('btn-save-logo').disabled = false;
+    document.getElementById('btn-remove-logo').style.display='inline-block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveLogo(){
+  if(!pendingLogoB64){ toast('Selecciona una imagen primero','warn'); return; }
+  try{
+    await db.from('configuracion').upsert({id:'logo', valor: pendingLogoB64, updated_at: new Date().toISOString()});
+    applyLogo(pendingLogoB64);
+    toast('Logo guardado correctamente','ok');
+    closeLogoModal();
+  }catch(e){ toast('Error al guardar logo: '+e.message,'err'); }
+}
+
+async function removeLogo(){
+  if(!confirm('¿Quitar el logo de la institución?')) return;
+  try{
+    await db.from('configuracion').delete().eq('id','logo');
+    clearLogoUI();
+    toast('Logo eliminado','ok');
+    closeLogoModal();
+  }catch(e){ toast('Error al eliminar logo','err'); }
+}
+
+function applyLogo(src){
+  // Topbar
+  const img = document.getElementById('tb-logo-img');
+  const ph  = document.getElementById('tb-logo-ph');
+  img.src = src; img.style.display='block'; ph.style.display='none';
+  // Modal preview
+  const bigImg = document.getElementById('logo-preview-big');
+  const bigPh  = document.getElementById('logo-preview-ph');
+  if(bigImg){ bigImg.src=src; bigImg.style.display='block'; }
+  if(bigPh)  bigPh.style.display='none';
+  const btnRemove = document.getElementById('btn-remove-logo');
+  if(btnRemove) btnRemove.style.display='inline-block';
+}
+
+function clearLogoUI(){
+  const img = document.getElementById('tb-logo-img');
+  const ph  = document.getElementById('tb-logo-ph');
+  img.style.display='none'; img.src=''; ph.style.display='block';
+}
+
+async function loadLogo(){
+  try{
+    const {data} = await db.from('configuracion').select('valor').eq('id','logo').maybeSingle();
+    if(data && data.valor) applyLogo(data.valor);
+  }catch(e){}
+}
+
 
 // ══════════════════════════════════════════
 //  INIT
