@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- VERSION 3.1 - FIXED -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -231,6 +230,12 @@ tr:hover td{background:var(--surf3);}
 .empty{text-align:center;padding:32px;color:var(--text3);font-size:13px;}
 .btn-refresh{padding:7px 14px;background:var(--surf2);border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text2);}
 .btn-refresh:hover{background:var(--surf3);}
+
+.btn-pdf-down{padding:7px 14px;background:linear-gradient(135deg,#C05A18,#E07830);border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:#fff;}
+.btn-pdf-down:hover{opacity:.9;}
+.dl-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.dl-row-label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;}
+
 .btn-excel{padding:7px 14px;background:var(--green);border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:#fff;}
 .toolbar-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
 .toolbar-row h3{font-size:15px;font-weight:800;flex:1;}
@@ -375,6 +380,18 @@ tr:hover td{background:var(--surf3);}
     </div>
     <div class="course-chips" id="course-chips"></div>
     <div id="save-bar-wrap"></div>
+    <div class="dl-row" id="dl-row-teacher" style="display:none;">
+      <span class="dl-row-label">Descargar:</span>
+      <button class="btn-excel" onclick="exportTeacherExcel()">
+        📊 Excel — este curso
+      </button>
+      <button class="btn-excel" onclick="exportTeacherAllExcel()" style="background:var(--accent);">
+        📊 Excel — todos mis cursos
+      </button>
+      <button class="btn-pdf-down" onclick="exportTeacherPDF()">
+        📄 PDF — resumen del curso
+      </button>
+    </div>
     <div class="stats-row" id="stats-row"></div>
     <div class="tbl-wrap" id="tbl-wrap">
       <div class="empty">Selecciona un curso para comenzar.</div>
@@ -438,7 +455,8 @@ tr:hover td{background:var(--surf3);}
         </select>
       </div>
       <button class="btn-refresh" onclick="loadDashboard()">↻ Actualizar</button>
-      <button class="btn-excel" onclick="exportDashExcel()">⬇ Excel</button>
+      <button class="btn-excel" onclick="exportDashExcel()">📊 Excel completo</button>
+      <button class="btn-pdf-down" onclick="exportDashPDF()">📄 PDF Dashboard</button>
     </div>
     <div id="dash-content"><div class="empty">Cargando datos...</div></div>
   </div>
@@ -956,6 +974,9 @@ async function loadGrades(){
   }
   renderTable();
   renderStats();
+  // show download row
+  const dlRow = document.getElementById('dl-row-teacher');
+  if(dlRow) dlRow.style.display='flex';
 }
 
 // ══════════════════════════════════════════
@@ -1303,32 +1324,504 @@ async function loadDashboard(){
   }
 }
 
+
 // ══════════════════════════════════════════
-//  EXCEL EXPORT
+//  EXPORTS — EXCEL Y PDF
 // ══════════════════════════════════════════
-function exportDashExcel(){
-  const wb=XLSX.utils.book_new();
-  const {courseAgg}=dashData;
-  if(!courseAgg){toast('Primero carga el dashboard','warn');return;}
-  const rows=[
-    ['I.E. Nueva Esperanza — Dashboard Institucional CNB 2026'],
-    [`Generado: ${new Date().toLocaleDateString('es-PE')}`],[],
-    ['Curso','Promedio','Evaluados','AD','A','B','C','%AD','%A','%B','%C'],
-    ...COURSES.map(c=>{
-      const a=courseAgg[c.id];
-      if(!a.n)return[c.label,'—',0,0,0,0,0,'—','—','—','—'];
-      const prom=Math.round(a.sum/a.n);
-      const tot=a.AD+a.A+a.B+a.C;
-      return[c.label,prom,tot,a.AD,a.A,a.B,a.C,
-        Math.round(a.AD/tot*100)+'%',Math.round(a.A/tot*100)+'%',
-        Math.round(a.B/tot*100)+'%',Math.round(a.C/tot*100)+'%'];
-    })
+
+// ── Helpers ──
+function getCtxInfo(){
+  return {
+    ie: 'I.E. Nueva Esperanza',
+    grado: document.getElementById('sel-grado').value,
+    seccion: document.getElementById('sel-seccion').value,
+    bimestre: document.getElementById('sel-bimestre').value,
+    docente: currentUser ? currentUser.nombre : '—',
+  };
+}
+
+function buildCourseSheet(wb, courseId, ctx){
+  const course = COURSES.find(c=>c.id===courseId);
+  if(!course) return;
+  const {ie,grado,seccion,bimestre,docente} = ctx;
+  const colLabels = COLS.map(c=>c.label);
+  const headers = ['N°','APELLIDOS Y NOMBRES',...colLabels,'PROMEDIO','NIVEL'];
+
+  // Styles helper
+  const makeRow = (i) => {
+    let sw=0,sv=0;
+    COLS.forEach(col=>{
+      const v=(grades[i]||{})[col.key];
+      if(v!==''&&v!==undefined&&v!==null){sv+=parseInt(v)*col.w;sw+=col.w;}
+    });
+    const avg = sw ? Math.round(sv/sw) : null;
+    return [
+      i+1,
+      names[i]||'',
+      ...COLS.map(col=>{const v=(grades[i]||{})[col.key]; return v===''||v===undefined?'':Number(v);}),
+      avg===null?'':avg,
+      avg===null?'':toLetter(avg)
+    ];
+  };
+
+  // Stats
+  let ev=0; const cnt={AD:0,A:0,B:0,C:0};
+  for(let i=0;i<numStudents;i++){
+    let sw=0,sv=0;
+    COLS.forEach(col=>{const v=(grades[i]||{})[col.key];if(v!==''&&v!==undefined&&v!==null){sv+=parseInt(v)*col.w;sw+=col.w;}});
+    if(sw){ev++;const l=toLetter(Math.round(sv/sw));cnt[l]++;}
+  }
+
+  const data = [
+    [`REGISTRO AUXILIAR DE EVALUACIÓN — ${course.label.toUpperCase()}`],
+    [`${ie} | ${grado} Grado — Sección ${seccion} | Bimestre ${bimestre} | Docente: ${docente}`],
+    [`CNB 2026 | Ponderación: Sem×1 · Ev×1.5 · Comp×1 | Fecha: ${new Date().toLocaleDateString('es-PE')}`],
+    [],
+    headers,
+    ...Array.from({length:numStudents},(_,i)=>makeRow(i)),
+    [],
+    ['ESCALA DE CALIFICACIÓN','','','','RESULTADOS DEL CURSO'],
+    ['AD = 18-20','Logro Destacado','','EVALUADOS:',ev,'de',numStudents],
+    ['A  = 14-17','Logro Esperado', '','AD:',cnt.AD,'=',ev?Math.round(cnt.AD/ev*100)+'%':'—'],
+    ['B  = 11-13','En Proceso',     '','A: ',cnt.A, '=',ev?Math.round(cnt.A/ev*100)+'%':'—'],
+    ['C  = 00-10','En Inicio',      '','B: ',cnt.B, '=',ev?Math.round(cnt.B/ev*100)+'%':'—'],
+    ['','','','C: ',cnt.C,'=',ev?Math.round(cnt.C/ev*100)+'%':'—'],
   ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Column widths
+  ws['!cols'] = [{wch:5},{wch:34},...COLS.map(()=>({wch:8})),{wch:10},{wch:8}];
+
+  // Merges for title rows
+  const ncols = headers.length - 1;
+  ws['!merges'] = [
+    {s:{r:0,c:0},e:{r:0,c:ncols}},
+    {s:{r:1,c:0},e:{r:1,c:ncols}},
+    {s:{r:2,c:0},e:{r:2,c:ncols}},
+  ];
+
+  // Cell styles using xlsx write options
+  const styleTitle = {font:{bold:true,sz:13,color:{rgb:'1A3E7A'}},fill:{fgColor:{rgb:'E3EBF8'}},alignment:{horizontal:'center'}};
+  const styleSubtitle = {font:{sz:11},fill:{fgColor:{rgb:'EDE9E2'}},alignment:{horizontal:'center'}};
+  const styleHeader = {font:{bold:true,sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'2B5EA7'}},alignment:{horizontal:'center'}};
+
+  // Apply styles to title/header rows (A1:last col)
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  // Style row 0 (title)
+  for(let c=range.s.c;c<=range.e.c;c++){
+    const cell = XLSX.utils.encode_cell({r:0,c});
+    if(!ws[cell]) ws[cell]={v:'',t:'s'};
+    ws[cell].s = styleTitle;
+  }
+  // Style row 1,2 (subtitles)
+  for(let row=1;row<=2;row++){
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const cell = XLSX.utils.encode_cell({r:row,c});
+      if(!ws[cell]) ws[cell]={v:'',t:'s'};
+      ws[cell].s = styleSubtitle;
+    }
+  }
+  // Style row 4 (headers)
+  for(let c=range.s.c;c<=range.e.c;c++){
+    const cell = XLSX.utils.encode_cell({r:4,c});
+    if(!ws[cell]) ws[cell]={v:'',t:'s'};
+    ws[cell].s = styleHeader;
+  }
+  // Color data rows alternating + color nivel column
+  for(let r=5;r<5+numStudents;r++){
+    const fillClr = r%2===0 ? 'F9F7F4' : 'FFFFFF';
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const cell = XLSX.utils.encode_cell({r,c});
+      if(!ws[cell]) ws[cell]={v:'',t:'s'};
+      ws[cell].s = {fill:{fgColor:{rgb:fillClr}},font:{sz:10},alignment:{horizontal:c<=1?'left':'center'}};
+    }
+    // Color nivel cell (last column)
+    const nivelCell = XLSX.utils.encode_cell({r,c:range.e.c});
+    const nivelVal = ws[nivelCell]?.v||'';
+    const nivelColor = nivelVal==='AD'?'D4F2E6':nivelVal==='A'?'D6E8FB':nivelVal==='B'?'FEF3CE':nivelVal==='C'?'FBE0E0':'FFFFFF';
+    const nivelTxt  = nivelVal==='AD'?'0E6E45':nivelVal==='A'?'1558A0':nivelVal==='B'?'7A5C0A':nivelVal==='C'?'9B1B1B':'000000';
+    if(ws[nivelCell]) ws[nivelCell].s = {fill:{fgColor:{rgb:nivelColor}},font:{bold:true,sz:10,color:{rgb:nivelTxt}},alignment:{horizontal:'center'}};
+    // Color promedio cell
+    const promCell = XLSX.utils.encode_cell({r,c:range.e.c-1});
+    const promVal = ws[promCell]?.v;
+    if(promVal!==''&&promVal!==undefined){
+      const pn=parseInt(promVal);
+      const pClr = pn>=18?'D4F2E6':pn>=14?'D6E8FB':pn>=11?'FEF3CE':'FBE0E0';
+      const pTxt = pn>=18?'0E6E45':pn>=14?'1558A0':pn>=11?'7A5C0A':'9B1B1B';
+      ws[promCell].s = {fill:{fgColor:{rgb:pClr}},font:{bold:true,sz:10,color:{rgb:pTxt}},alignment:{horizontal:'center'}};
+    }
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, course.short.substring(0,31));
+}
+
+// ── DOCENTE: Excel de este curso ──
+function exportTeacherExcel(){
+  const ctx = getCtxInfo();
+  const wb = XLSX.utils.book_new();
+  buildCourseSheet(wb, activeCourse, ctx);
+  // Summary tab
+  addSummarySheet(wb, [activeCourse], ctx);
+  XLSX.writeFile(wb, `Notas_${ctx.grado.replace('°','G')}_${ctx.seccion}_Bim${ctx.bimestre}_${COURSES.find(c=>c.id===activeCourse)?.short||activeCourse}.xlsx`);
+}
+
+// ── DOCENTE: Excel de todos sus cursos activos ──
+async function exportTeacherAllExcel(){
+  const ctx = getCtxInfo();
+  const wb = XLSX.utils.book_new();
+  toast('Preparando Excel... espera unos segundos','ok');
+
+  // Save current state
+  const savedGrades = JSON.parse(JSON.stringify(grades));
+  const savedCourse = activeCourse;
+
+  for(const cid of visibleCourseIds){
+    // Load each course data from supabase
+    const {grado,seccion,bimestre} = ctx;
+    try{
+      const {data:gr} = await db.from('registros')
+        .select('estudiante_nombre')
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+        .eq('curso_id',cid).eq('columna_key','snapshot').maybeSingle();
+      grades = gr ? JSON.parse(gr.estudiante_nombre)||{} : {};
+    }catch(e){ grades={}; }
+    activeCourse = cid;
+    buildCourseSheet(wb, cid, ctx);
+  }
+
+  // Restore
+  grades = savedGrades;
+  activeCourse = savedCourse;
+  addSummarySheet(wb, visibleCourseIds, ctx);
+  XLSX.writeFile(wb, `MisCursos_${ctx.grado.replace('°','G')}_${ctx.seccion}_Bim${ctx.bimestre}_${ctx.docente.split(' ')[0]}.xlsx`);
+}
+
+// ── Summary sheet helper ──
+function addSummarySheet(wb, courseIds, ctx){
+  const {ie,grado,seccion,bimestre,docente} = ctx;
+  const rows = [
+    [`RESUMEN — ${ie}`],
+    [`${grado} Grado | Sección ${seccion} | Bimestre ${bimestre} | Docente: ${docente}`],
+    [`Fecha: ${new Date().toLocaleDateString('es-PE')}`],
+    [],
+    ['CURSO','MATRICULADOS','EVALUADOS','AD','A','B','C','%AD','%A','%B','%C','PROMEDIO CLASE'],
+  ];
+  courseIds.forEach(cid=>{
+    const c=COURSES.find(x=>x.id===cid); if(!c)return;
+    let ev=0,sum=0,n=0; const cnt={AD:0,A:0,B:0,C:0};
+    for(let i=0;i<numStudents;i++){
+      let sw=0,sv=0;
+      COLS.forEach(col=>{const v=(grades[i]||{})[col.key];if(v!==''&&v!==undefined&&v!==null){sv+=parseInt(v)*col.w;sw+=col.w;}});
+      if(sw){const avg=Math.round(sv/sw);ev++;sum+=avg;n++;cnt[toLetter(avg)]++;}
+    }
+    rows.push([c.label,numStudents,ev,cnt.AD,cnt.A,cnt.B,cnt.C,
+      ev?Math.round(cnt.AD/ev*100)+'%':'—',ev?Math.round(cnt.A/ev*100)+'%':'—',
+      ev?Math.round(cnt.B/ev*100)+'%':'—',ev?Math.round(cnt.C/ev*100)+'%':'—',
+      n?Math.round(sum/n):'—']);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:24},...Array(11).fill({wch:9})];
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:11}},{s:{r:1,c:0},e:{r:1,c:11}},{s:{r:2,c:0},e:{r:2,c:11}}];
+  // Style title
+  for(let c=0;c<=11;c++){
+    const cell=XLSX.utils.encode_cell({r:0,c});
+    if(!ws[cell])ws[cell]={v:'',t:'s'};
+    ws[cell].s={font:{bold:true,sz:13,color:{rgb:'1A3E7A'}},fill:{fgColor:{rgb:'E3EBF8'}},alignment:{horizontal:'center'}};
+  }
+  // Style header row (row 4)
+  for(let c=0;c<=11;c++){
+    const cell=XLSX.utils.encode_cell({r:4,c});
+    if(!ws[cell])ws[cell]={v:'',t:'s'};
+    ws[cell].s={font:{bold:true,sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'2B5EA7'}},alignment:{horizontal:'center'}};
+  }
+  XLSX.utils.book_append_sheet(wb,ws,'RESUMEN');
+}
+
+// ── DIRECTOR: Excel completo ──
+function exportDashExcel(){
+  if(!dashData||!dashData.courseAgg){ toast('Primero carga el dashboard','warn'); return; }
+  const ctx = getCtxInfo();
+  const gFil=document.getElementById('dash-grado').value;
+  const sFil=document.getElementById('dash-seccion').value;
+  const bFil=document.getElementById('dash-bimestre').value;
+  const {courseAgg} = dashData;
+  const wb = XLSX.utils.book_new();
+
+  // Main dashboard sheet
+  const rows=[
+    ['DASHBOARD INSTITUCIONAL — I.E. NUEVA ESPERANZA'],
+    [`Grado: ${gFil==='todos'?'Todos':gFil} | Sección: ${sFil==='todos'?'Todas':sFil} | Bimestre: ${bFil==='todos'?'Todos':bFil}`],
+    [`Generado por: ${ctx.docente} | Fecha: ${new Date().toLocaleDateString('es-PE')}`],
+    [`CNB 2026 — Escala: AD=18-20 | A=14-17 | B=11-13 | C=00-10`],
+    [],
+    ['CURSO','PROM. CLASE','EVALUADOS','AD','A','B','C','%AD','%A','%B','%C','DOCENTE(S)'],
+  ];
+  COURSES.forEach(c=>{
+    const a=courseAgg[c.id];
+    if(!a)return;
+    const tot=a.AD+a.A+a.B+a.C;
+    const prom=a.n?Math.round(a.sum/a.n):0;
+    const teachers=[...a.teachers].filter(Boolean).join(', ')||'—';
+    rows.push([c.label,tot?prom:'—',tot,a.AD,a.A,a.B,a.C,
+      tot?Math.round(a.AD/tot*100)+'%':'—',tot?Math.round(a.A/tot*100)+'%':'—',
+      tot?Math.round(a.B/tot*100)+'%':'—',tot?Math.round(a.C/tot*100)+'%':'—',teachers]);
+  });
+  // Totals row
+  const totAD=Object.values(courseAgg).reduce((s,a)=>s+a.AD,0);
+  const totA =Object.values(courseAgg).reduce((s,a)=>s+a.A,0);
+  const totB =Object.values(courseAgg).reduce((s,a)=>s+a.B,0);
+  const totC =Object.values(courseAgg).reduce((s,a)=>s+a.C,0);
+  const totAll=totAD+totA+totB+totC;
+  rows.push([]);
+  rows.push(['TOTALES INSTITUCIONALES','',totAll,totAD,totA,totB,totC,
+    totAll?Math.round(totAD/totAll*100)+'%':'—',totAll?Math.round(totA/totAll*100)+'%':'—',
+    totAll?Math.round(totB/totAll*100)+'%':'—',totAll?Math.round(totC/totAll*100)+'%':'—','']);
+
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:24},...Array(10).fill({wch:10})];
-  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:10}},{s:{r:1,c:0},e:{r:1,c:10}}];
+  ws['!cols']=[{wch:26},{wch:12},{wch:11},{wch:7},{wch:7},{wch:7},{wch:7},{wch:7},{wch:7},{wch:7},{wch:7},{wch:28}];
+  const nc=11;
+  ws['!merges']=[
+    {s:{r:0,c:0},e:{r:0,c:nc}},{s:{r:1,c:0},e:{r:1,c:nc}},
+    {s:{r:2,c:0},e:{r:2,c:nc}},{s:{r:3,c:0},e:{r:3,c:nc}},
+  ];
+  // Styles
+  const sTitle={font:{bold:true,sz:14,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1A3E7A'}},alignment:{horizontal:'center'}};
+  const sSub  ={font:{sz:11},fill:{fgColor:{rgb:'E3EBF8'}},alignment:{horizontal:'center'}};
+  const sHdr  ={font:{bold:true,sz:10,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'2B5EA7'}},alignment:{horizontal:'center'}};
+  const sTot  ={font:{bold:true,sz:11,color:{rgb:'1A3E7A'}},fill:{fgColor:{rgb:'D6E8FB'}},alignment:{horizontal:'center'}};
+  for(let c=0;c<=nc;c++){
+    const r0=XLSX.utils.encode_cell({r:0,c}); if(!ws[r0])ws[r0]={v:'',t:'s'}; ws[r0].s=sTitle;
+    for(let r=1;r<=3;r++){const rc=XLSX.utils.encode_cell({r,c}); if(!ws[rc])ws[rc]={v:'',t:'s'}; ws[rc].s=sSub;}
+    const r5=XLSX.utils.encode_cell({r:5,c}); if(!ws[r5])ws[r5]={v:'',t:'s'}; ws[r5].s=sHdr;
+  }
+  // Alternate rows + color nivel cols
+  const dataStart=6;
+  for(let r=dataStart;r<dataStart+COURSES.length;r++){
+    const alt=r%2===0?'F9F7F4':'FFFFFF';
+    for(let c=0;c<=nc;c++){
+      const cell=XLSX.utils.encode_cell({r,c}); if(!ws[cell])ws[cell]={v:'',t:'s'};
+      ws[cell].s={fill:{fgColor:{rgb:alt}},font:{sz:10},alignment:{horizontal:c===0?'left':'center'}};
+    }
+    // Color prom cell
+    const promCell=XLSX.utils.encode_cell({r,c:1});
+    const pv=ws[promCell]?.v;
+    if(pv&&pv!=='—'){const pn=parseInt(pv);const pc=pn>=18?'D4F2E6':pn>=14?'D6E8FB':pn>=11?'FEF3CE':'FBE0E0';const pt=pn>=18?'0E6E45':pn>=14?'1558A0':pn>=11?'7A5C0A':'9B1B1B';ws[promCell].s={fill:{fgColor:{rgb:pc}},font:{bold:true,sz:11,color:{rgb:pt}},alignment:{horizontal:'center'}};}
+  }
+  // Totals row style
+  const totRow=dataStart+COURSES.length+1;
+  for(let c=0;c<=nc;c++){const cell=XLSX.utils.encode_cell({r:totRow,c});if(!ws[cell])ws[cell]={v:'',t:'s'};ws[cell].s=sTot;}
   XLSX.utils.book_append_sheet(wb,ws,'Dashboard');
-  XLSX.writeFile(wb,'NuevaEsperanza_Dashboard_CNB2026.xlsx');
+  XLSX.writeFile(wb,`Dashboard_NuevaEsperanza_${gFil}_${bFil}_${new Date().toLocaleDateString('es-PE').replace(/\//g,'-')}.xlsx`);
+}
+
+// ── PDF DOCENTE: resumen visual del curso actual ──
+function exportTeacherPDF(){
+  const ctx = getCtxInfo();
+  const course = COURSES.find(c=>c.id===activeCourse);
+  if(!course){ toast('Selecciona un curso primero','warn'); return; }
+  let ev=0,sumP=0,nP=0; const cnt={AD:0,A:0,B:0,C:0};
+  const studentRows=[];
+  for(let i=0;i<numStudents;i++){
+    let sw=0,sv=0;
+    COLS.forEach(col=>{const v=(grades[i]||{})[col.key];if(v!==''&&v!==undefined&&v!==null){sv+=parseInt(v)*col.w;sw+=col.w;}});
+    const avg=sw?Math.round(sv/sw):null;
+    if(avg!==null){ev++;cnt[toLetter(avg)]++;sumP+=avg;nP++;}
+    studentRows.push({name:names[i]||'—',avg,letter:avg!==null?toLetter(avg):'—'});
+  }
+  const promClase=nP?Math.round(sumP/nP):0;
+  const logoSrc=document.getElementById('tb-logo-img').src||'';
+  const logoHtml=logoSrc&&logoSrc.startsWith('data:')?`<img src="${logoSrc}" style="width:60px;height:60px;object-fit:contain;border-radius:8px;">`:
+    `<div style="width:60px;height:60px;background:#E3EBF8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#2B5EA7;">LNE</div>`;
+  const colColor={AD:'#D4F2E6',A:'#D6E8FB',B:'#FEF3CE',C:'#FBE0E0'};
+  const txtColor={AD:'#0E6E45',A:'#1558A0',B:'#7A5C0A',C:'#9B1B1B'};
+  const barPct=l=>ev>0?Math.round(cnt[l]/ev*100):0;
+
+  const tableRows=studentRows.map((s,i)=>{
+    const bg=s.letter!=='—'?colColor[s.letter]:'#F9F7F4';
+    const tx=s.letter!=='—'?txtColor[s.letter]:'#A09890';
+    return `<tr style="background:${i%2===0?'#FFFFFF':'#F9F7F4'};">
+      <td style="padding:5px 8px;font-size:11px;text-align:center;color:#A09890;">${i+1}</td>
+      <td style="padding:5px 8px;font-size:11px;font-weight:600;">${s.name}</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:800;text-align:center;background:${bg};color:${tx};">${s.avg!==null?s.avg:'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;font-weight:800;text-align:center;background:${bg};color:${tx};">${s.letter}</td>
+    </tr>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Plus Jakarta Sans',sans-serif;background:white;color:#17150F;font-size:13px;padding:28px;}
+    @media print{body{padding:0;}}
+  </style>
+  </head><body>
+  <div style="border-bottom:3px solid #2B5EA7;padding-bottom:16px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">
+    ${logoHtml}
+    <div style="flex:1;">
+      <h1 style="font-size:18px;font-weight:800;color:#17150F;">Reporte de Evaluación — ${course.label}</h1>
+      <p style="font-size:11px;color:#6B6258;margin-top:3px;">I.E. Nueva Esperanza | ${ctx.grado} Grado — Sección ${ctx.seccion} | Bimestre ${ctx.bimestre}</p>
+      <p style="font-size:11px;color:#6B6258;">Docente: <strong>${ctx.docente}</strong> | CNB 2026 | ${new Date().toLocaleDateString('es-PE',{year:'numeric',month:'long',day:'numeric'})}</p>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:22px;font-weight:800;color:${promClase>=18?'#0E6E45':promClase>=14?'#1558A0':promClase>=11?'#7A5C0A':'#9B1B1B'};">${promClase||'—'}</div>
+      <div style="font-size:10px;color:#A09890;">Promedio clase</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+    ${['AD','A','B','C'].map(l=>`<div style="background:${colColor[l]};border-radius:8px;padding:10px 14px;min-width:100px;text-align:center;">
+      <div style="font-size:20px;font-weight:800;color:${txtColor[l]};">${cnt[l]}</div>
+      <div style="font-size:9px;font-weight:700;color:${txtColor[l]};text-transform:uppercase;letter-spacing:.5px;">${l} ${l==='AD'?'Dest.':l==='A'?'Esp.':l==='B'?'Proc.':'Inicio'}</div>
+      <div style="font-size:11px;font-weight:600;color:${txtColor[l]};">${barPct(l)}%</div>
+    </div>`).join('')}
+    <div style="background:#F4F1EC;border-radius:8px;padding:10px 14px;min-width:100px;text-align:center;">
+      <div style="font-size:20px;font-weight:800;color:#17150F;">${ev}</div>
+      <div style="font-size:9px;font-weight:700;color:#6B6258;text-transform:uppercase;letter-spacing:.5px;">Evaluados</div>
+      <div style="font-size:11px;color:#6B6258;">de ${numStudents}</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:14px;">
+    ${['AD','A','B','C'].map(l=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="width:28px;height:18px;border-radius:4px;background:${colColor[l]};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:${txtColor[l]};">${l}</span>
+      <div style="flex:1;height:10px;background:#EDE9E2;border-radius:5px;overflow:hidden;">
+        <div style="width:${barPct(l)}%;height:100%;background:${txtColor[l]};border-radius:5px;"></div>
+      </div>
+      <span style="font-size:11px;color:#6B6258;min-width:70px;">${cnt[l]} alumnos · ${barPct(l)}%</span>
+    </div>`).join('')}
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead>
+      <tr style="background:#2B5EA7;">
+        <th style="padding:7px 8px;color:white;font-weight:700;text-align:center;width:32px;">#</th>
+        <th style="padding:7px 8px;color:white;font-weight:700;text-align:left;">Apellidos y Nombres</th>
+        <th style="padding:7px 8px;color:white;font-weight:700;text-align:center;width:70px;">Promedio</th>
+        <th style="padding:7px 8px;color:white;font-weight:700;text-align:center;width:60px;">Nivel</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+
+  <div style="margin-top:24px;border-top:2px solid #EDE9E2;padding-top:12px;display:flex;justify-content:space-between;align-items:flex-end;">
+    <div>
+      <p style="font-size:10px;color:#A09890;">I.E. Nueva Esperanza | ${ctx.grado} Grado Sección ${ctx.seccion} | Bimestre ${ctx.bimestre} 2026</p>
+      <p style="font-size:10px;color:#A09890;">CNB 2026 · Ponderación: Sem×1 · Ev×1.5 · Comp×1</p>
+    </div>
+    <div style="text-align:center;">
+      <div style="width:100px;height:2px;background:#2B5EA7;margin-bottom:4px;"></div>
+      <div style="font-size:10px;color:#6B6258;">Firma del docente</div>
+    </div>
+  </div>
+  <script>window.onload=()=>setTimeout(()=>{window.print();},600);<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=850,height=700');
+  w.document.write(html);
+  w.document.close();
+}
+
+// ── PDF DIRECTOR: dashboard institucional ──
+function exportDashPDF(){
+  if(!dashData||!dashData.courseAgg){ toast('Primero carga el dashboard','warn'); return; }
+  const ctx=getCtxInfo();
+  const gFil=document.getElementById('dash-grado').value;
+  const sFil=document.getElementById('dash-seccion').value;
+  const bFil=document.getElementById('dash-bimestre').value;
+  const {courseAgg,totals,totalEv}=dashData;
+  const logoSrc=document.getElementById('tb-logo-img').src||'';
+  const logoHtml=logoSrc&&logoSrc.startsWith('data:')?`<img src="${logoSrc}" style="width:60px;height:60px;object-fit:contain;border-radius:8px;">`:
+    `<div style="width:60px;height:60px;background:#E3EBF8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#2B5EA7;">LNE</div>`;
+  const colColor={AD:'#D4F2E6',A:'#D6E8FB',B:'#FEF3CE',C:'#FBE0E0'};
+  const txtColor={AD:'#0E6E45',A:'#1558A0',B:'#7A5C0A',C:'#9B1B1B'};
+
+  const courseRows=COURSES.map(c=>{
+    const a=courseAgg[c.id];
+    if(!a||!a.n) return `<tr style="background:#F9F7F4;"><td style="padding:5px 9px;font-size:11px;font-weight:600;">${c.label}</td><td colspan="5" style="padding:5px 9px;font-size:10px;color:#A09890;text-align:center;">Sin datos</td></tr>`;
+    const tot=a.AD+a.A+a.B+a.C;
+    const prom=Math.round(a.sum/a.n);
+    const pc=prom>=18?colColor.AD:prom>=14?colColor.A:prom>=11?colColor.B:colColor.C;
+    const pt=prom>=18?txtColor.AD:prom>=14?txtColor.A:prom>=11?txtColor.B:txtColor.C;
+    const adP=tot?Math.round(a.AD/tot*100):0;
+    const aP=tot?Math.round(a.A/tot*100):0;
+    const bP=tot?Math.round(a.B/tot*100):0;
+    const cP=tot?Math.round(a.C/tot*100):0;
+    const teachers=[...a.teachers].filter(Boolean).join(', ')||'—';
+    return `<tr style="border-bottom:1px solid #EDE9E2;">
+      <td style="padding:5px 9px;font-size:11px;font-weight:700;">${c.label}</td>
+      <td style="padding:5px 9px;font-size:13px;font-weight:800;text-align:center;background:${pc};color:${pt};">${prom}</td>
+      <td style="padding:5px 9px;font-size:11px;text-align:center;color:#6B6258;">${tot}</td>
+      <td style="padding:5px 9px;">
+        <div style="display:flex;height:10px;border-radius:4px;overflow:hidden;background:#EDE9E2;">
+          <div style="width:${adP}%;background:#0E6E45;"></div>
+          <div style="width:${aP}%;background:#1558A0;"></div>
+          <div style="width:${bP}%;background:#E0B840;"></div>
+          <div style="width:${cP}%;background:#E07070;"></div>
+        </div>
+        <div style="font-size:9px;color:#6B6258;margin-top:2px;">${adP}% AD · ${aP}% A · ${bP}% B · ${cP}% C</div>
+      </td>
+      <td style="padding:5px 9px;font-size:10px;color:#6B6258;">${teachers}</td>
+    </tr>`;
+  }).join('');
+
+  const tAD=totals.AD,tA=totals.A,tB=totals.B,tC=totals.C;
+  const tAll=tAD+tA+tB+tC;
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Plus Jakarta Sans',sans-serif;background:white;color:#17150F;font-size:13px;padding:28px;}@media print{body{padding:0;}}</style>
+  </head><body>
+  <div style="border-bottom:3px solid #2B5EA7;padding-bottom:16px;margin-bottom:18px;display:flex;align-items:center;gap:14px;">
+    ${logoHtml}
+    <div style="flex:1;">
+      <h1 style="font-size:18px;font-weight:800;">Dashboard Institucional — I.E. Nueva Esperanza</h1>
+      <p style="font-size:11px;color:#6B6258;margin-top:3px;">Grado: ${gFil==='todos'?'Todos':gFil} | Sección: ${sFil==='todos'?'Todas':sFil} | Bimestre: ${bFil==='todos'?'Todos':bFil} | CNB 2026</p>
+      <p style="font-size:11px;color:#6B6258;">Generado por: ${ctx.docente} | ${new Date().toLocaleDateString('es-PE',{year:'numeric',month:'long',day:'numeric'})}</p>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+    <div style="background:#E3EBF8;border-radius:10px;padding:12px;text-align:center;">
+      <div style="font-size:24px;font-weight:800;color:#1A3E7A;">${tAll}</div>
+      <div style="font-size:10px;color:#2B5EA7;font-weight:700;text-transform:uppercase;margin-top:3px;">Total evaluados</div>
+    </div>
+    ${['AD','A','B','C'].slice(0,3).map(l=>`<div style="background:${colColor[l]};border-radius:10px;padding:12px;text-align:center;">
+      <div style="font-size:24px;font-weight:800;color:${txtColor[l]};">${totals[l]}</div>
+      <div style="font-size:10px;color:${txtColor[l]};font-weight:700;text-transform:uppercase;margin-top:3px;">${l} · ${tAll?Math.round(totals[l]/tAll*100):0}%</div>
+    </div>`).join('')}
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+    <thead>
+      <tr style="background:#2B5EA7;">
+        <th style="padding:7px 9px;color:white;font-weight:700;text-align:left;">Curso</th>
+        <th style="padding:7px 9px;color:white;font-weight:700;text-align:center;width:75px;">Promedio</th>
+        <th style="padding:7px 9px;color:white;font-weight:700;text-align:center;width:70px;">Evaluados</th>
+        <th style="padding:7px 9px;color:white;font-weight:700;width:180px;">Distribución</th>
+        <th style="padding:7px 9px;color:white;font-weight:700;text-align:left;">Docente(s)</th>
+      </tr>
+    </thead>
+    <tbody>${courseRows}</tbody>
+  </table>
+
+  <div style="border-top:2px solid #EDE9E2;padding-top:12px;display:flex;justify-content:space-between;align-items:flex-end;">
+    <div>
+      <p style="font-size:10px;color:#A09890;">I.E. Nueva Esperanza | Registro Académico CNB 2026</p>
+      <p style="font-size:10px;color:#A09890;">AD=18-20 Logro Destacado · A=14-17 Logro Esperado · B=11-13 En Proceso · C=00-10 En Inicio</p>
+    </div>
+    <div style="text-align:center;">
+      <div style="width:120px;height:2px;background:#2B5EA7;margin-bottom:4px;"></div>
+      <div style="font-size:10px;color:#6B6258;">Director / Coordinador</div>
+    </div>
+  </div>
+  <script>window.onload=()=>setTimeout(()=>{window.print();},600);<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=700');
+  w.document.write(html);
+  w.document.close();
 }
 
 // ══════════════════════════════════════════
