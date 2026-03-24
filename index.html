@@ -253,6 +253,12 @@ tr:hover td{background:var(--surf3);}
 .ct-lbl{font-size:13px;font-weight:700;color:var(--text);}
 .ct-short{font-size:10px;color:var(--text3);margin-top:1px;}
 
+
+/* READONLY MODE */
+.readonly-banner{display:flex;align-items:center;gap:10px;padding:9px 14px;background:#FEF3CE;border:1.5px solid #E0B840;border-radius:8px;font-size:12px;font-weight:700;color:#7A5C0A;margin-bottom:12px;}
+.si.readonly{background:var(--surf2)!important;color:var(--text3)!important;border-color:var(--border)!important;cursor:not-allowed;pointer-events:none;}
+.tname.readonly input{pointer-events:none;color:var(--text2);}
+
 @media(max-width:700px){
   .form-row{grid-template-columns:1fr 1fr;}
   .ctx-row{gap:8px;}
@@ -369,6 +375,14 @@ tr:hover td{background:var(--surf3);}
       </div>
       <div class="cf"><label>N° alumnos</label>
         <input id="sel-nalum" type="number" min="1" max="45" value="28" style="width:60px;" onchange="onAlumChange()">
+      </div>
+      <div class="cf" style="justify-content:flex-end;">
+        <label>&nbsp;</label>
+        <button onclick="sortAlphabetically()" style="padding:6px 14px;background:var(--surf);border:1.5px solid var(--border2);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text2);display:flex;align-items:center;gap:5px;"
+          title="Ordenar lista de alumnos de A a Z">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
+          Orden A–Z
+        </button>
       </div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -852,6 +866,10 @@ function onAlumChange(){
 // ══════════════════════════════════════════
 //  COURSE CHIPS
 // ══════════════════════════════════════════
+// Course ownership & readonly state
+let courseOwner = null;   // name of whoever saved this course last
+let isReadOnly = false;   // true when viewing another teacher's course
+
 // visible courses per user (loaded from supabase configuracion)
 let visibleCourseIds = COURSES.map(c=>c.id); // default: all visible
 let tempManageIds = [];
@@ -958,15 +976,21 @@ async function loadGrades(){
 
     // Cargar notas del curso activo
     const {data:gr}=await db.from('registros')
-      .select('estudiante_nombre')
+      .select('estudiante_nombre,docente_nombre')
       .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
       .eq('curso_id',activeCourse).eq('columna_key','snapshot')
       .maybeSingle();
     if(gr){
       grades=JSON.parse(gr.estudiante_nombre)||{};
+      courseOwner=gr.docente_nombre||null;
     } else {
       grades={};
+      courseOwner=null;
     }
+    // Director can always edit. Teachers can only edit if no owner OR they are the owner
+    isReadOnly = currentUser.rol !== 'director' &&
+                 courseOwner !== null &&
+                 courseOwner !== currentUser.nombre;
     setSyncState('ok','sincronizado');
   }catch(e){
     setSyncState('error','error de red');
@@ -983,6 +1007,7 @@ async function loadGrades(){
 //  SAVE TO SUPABASE
 // ══════════════════════════════════════════
 function scheduleSave(){
+  if(isReadOnly){ return; }  // never save if viewing another teacher's course
   clearTimeout(saveTimer);
   setSyncState('saving','guardando...');
   showSaveBar('saving');
@@ -1035,6 +1060,20 @@ function showSaveBar(state){
 //  RENDER TABLE
 // ══════════════════════════════════════════
 function renderTable(){
+  // Readonly banner
+  const dlRow=document.getElementById('dl-row-teacher');
+  const existingBanner=document.getElementById('readonly-banner');
+  if(existingBanner)existingBanner.remove();
+  if(isReadOnly){
+    const banner=document.createElement('div');
+    banner.id='readonly-banner';
+    banner.className='readonly-banner';
+    banner.innerHTML=`⚠️ Este curso fue registrado por <strong style="margin:0 4px;">${courseOwner}</strong>. Solo puedes ver las notas, no editarlas.`;
+    document.getElementById('save-bar-wrap').after(banner);
+    if(dlRow)dlRow.style.display='none';
+  } else {
+    if(dlRow)dlRow.style.display='flex';
+  }
   const gRow=`
     <th rowspan="2" style="width:26px;text-align:center;background:var(--surf2);font-size:9px;font-weight:700;color:var(--text2);padding:5px 3px;border-bottom:2px solid var(--border);">#</th>
     <th rowspan="2" style="min-width:160px;text-align:left;background:var(--surf2);font-size:9px;font-weight:700;color:var(--text2);padding:5px 7px;border-bottom:2px solid var(--border);">APELLIDOS Y NOMBRES</th>
@@ -1057,11 +1096,12 @@ function renderTable(){
       const isLast=ci===8||ci===11||ci===12;
       return`<td style="text-align:center;${isLast?'border-right:2px solid var(--border2);':''}">
         <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
-          <input type="number" min="0" max="20" class="si ${tc} ${lv?'v'+lv:''}"
+          <input type="number" min="0" max="20" class="si ${tc} ${lv?'v'+lv:''} ${isReadOnly?'readonly':''}"
             value="${v}" placeholder="—"
             data-i="${i}" data-k="${col.key}"
-            oninput="onScore(this)"
-            onkeydown="navKey(event,${i},'${col.key}')">
+            ${isReadOnly?'readonly disabled':''}
+            oninput="${isReadOnly?'':'onScore(this)'}"
+            onkeydown="${isReadOnly?'':'navKey(event,'+i+',\''+col.key+'\')'}">
           <span class="ml ${lv?'ml'+lv:''}">${lv}</span>
         </div>
       </td>`;
@@ -1071,8 +1111,8 @@ function renderTable(){
       :`<span class="lb lb-e"><span class="ln">—</span><span class="ll">—</span></span>`;
     return`<tr>
       <td class="tcn">${i+1}</td>
-      <td class="tname"><input placeholder="Apellidos y nombres" value="${names[i]||''}"
-        data-ni="${i}" oninput="onName(this)"></td>
+      <td class="tname ${isReadOnly?'readonly':''}"><input placeholder="Apellidos y nombres" value="${names[i]||''}"
+        data-ni="${i}" ${isReadOnly?'readonly disabled':''} oninput="${isReadOnly?'':'onName(this)'}" style="${isReadOnly?'pointer-events:none;color:var(--text2);':''}"></td>
       ${cells}
       <td style="text-align:center;">${badge}</td>
     </tr>`;
@@ -1324,6 +1364,32 @@ async function loadDashboard(){
   }
 }
 
+
+
+// ══════════════════════════════════════════
+//  ORDENAR ALFABÉTICAMENTE
+// ══════════════════════════════════════════
+function sortAlphabetically(){
+  if(isReadOnly){ toast('No puedes modificar este curso','warn'); return; }
+  // Build student array with their grades
+  const students = Array.from({length:numStudents}, (_,i) => ({
+    name: names[i]||'',
+    grades: grades[i]||{}
+  }));
+  // Separate named and unnamed
+  const named   = students.filter(s=>s.name.trim()!=='');
+  const unnamed = students.filter(s=>s.name.trim()==='');
+  // Sort named alphabetically (by last name first — split and sort)
+  named.sort((a,b)=>a.name.trim().localeCompare(b.name.trim(),'es',{sensitivity:'base'}));
+  // Reconstruct
+  const sorted = [...named, ...unnamed];
+  names = sorted.map(s=>s.name);
+  grades = {};
+  sorted.forEach((s,i)=>{ grades[i]=s.grades; });
+  renderTable();
+  scheduleSave();
+  toast('Lista ordenada de A a Z','ok');
+}
 
 // ══════════════════════════════════════════
 //  EXPORTS — EXCEL Y PDF
