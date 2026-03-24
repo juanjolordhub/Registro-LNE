@@ -254,10 +254,38 @@ tr:hover td{background:var(--surf3);}
 .ct-short{font-size:10px;color:var(--text3);margin-top:1px;}
 
 
-/* READONLY MODE */
-.readonly-banner{display:flex;align-items:center;gap:10px;padding:9px 14px;background:#FEF3CE;border:1.5px solid #E0B840;border-radius:8px;font-size:12px;font-weight:700;color:#7A5C0A;margin-bottom:12px;}
-.si.readonly{background:var(--surf2)!important;color:var(--text3)!important;border-color:var(--border)!important;cursor:not-allowed;pointer-events:none;}
-.tname.readonly input{pointer-events:none;color:var(--text2);}
+
+/* COURSE ASSIGNMENT SYSTEM */
+.course-assign-banner{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:12px;font-weight:700;margin-bottom:12px;border:1.5px solid;}
+.cab-mine{background:#D4F2E6;border-color:#5CC49A;color:#0E6E45;}
+.cab-other{background:#FEF3CE;border-color:#E0B840;color:#7A5C0A;}
+.cab-free{background:var(--accent-l);border-color:var(--accent);color:var(--accent);}
+.btn-claim{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:'Plus Jakarta Sans',sans-serif;}
+.btn-claim-take{background:var(--accent);color:white;}
+.btn-claim-take:hover{background:var(--accent-d);}
+.btn-claim-release{background:var(--c-bg);color:var(--c);border:1.5px solid var(--c-br);}
+.btn-claim-release:hover{background:#f5c5c5;}
+
+/* STUDENT MANAGER (Director) */
+.stud-mgr{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);margin-bottom:14px;}
+.stud-mgr h4{font-size:13px;font-weight:800;margin-bottom:12px;}
+.stud-input-row{display:flex;gap:6px;margin-bottom:8px;align-items:center;}
+.stud-input-row input{flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;}
+.stud-input-row input:focus{border-color:var(--accent);}
+.stud-num{width:30px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text3);flex-shrink:0;}
+.btn-del-stud{background:var(--c-bg);border:1px solid var(--c-br);border-radius:5px;width:24px;height:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;}
+.btn-del-stud:hover{background:#f5c5c5;}
+.btn-add-stud{padding:7px 16px;background:var(--green);border:none;border-radius:7px;font-size:12px;font-weight:700;color:white;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;}
+.btn-add-stud:hover{opacity:.88;}
+.assign-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;}
+.assign-card{background:var(--surf2);border:1.5px solid var(--border);border-radius:9px;padding:12px 14px;}
+.assign-card h5{font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text2);}
+.assign-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:12px;}
+.assign-teacher{color:var(--text2);}
+.assign-teacher.taken{color:var(--accent);font-weight:700;}
+.assign-teacher.free{color:var(--text3);font-style:italic;}
+.btn-reassign{padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;background:var(--orange-l);border:1px solid var(--orange);color:var(--orange);font-family:'Plus Jakarta Sans',sans-serif;}
+.btn-reassign:hover{opacity:.85;}
 
 @media(max-width:700px){
   .form-row{grid-template-columns:1fr 1fr;}
@@ -410,6 +438,16 @@ tr:hover td{background:var(--surf3);}
     <div class="tbl-wrap" id="tbl-wrap">
       <div class="empty">Selecciona un curso para comenzar.</div>
     </div>
+  </div>
+
+  <!-- VIEW: ESTUDIANTES (Director only) -->
+  <div class="view" id="view-estudiantes">
+    <div id="stud-mgr-content"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <!-- VIEW: ASIGNACIÓN DE CURSOS (Director only) -->
+  <div class="view" id="view-asignacion">
+    <div id="assign-content"><div class="empty">Cargando...</div></div>
   </div>
 
   <!-- VIEW: DOCENTES -->
@@ -823,10 +861,12 @@ function showApp(){
 
 function buildNav(){
   const tabs=[
-    {id:'notas',label:'📝 Ingreso de notas'},
+    {id:'notas',   label:'📝 Ingreso de notas'},
     ...(currentUser.rol==='director'?[
-      {id:'docentes',label:'👥 Gestionar docentes'},
-      {id:'dashboard',label:'📊 Dashboard institucional'},
+      {id:'estudiantes', label:'📋 Gestionar estudiantes'},
+      {id:'asignacion',  label:'🗂 Asignar cursos'},
+      {id:'docentes',    label:'👥 Gestionar docentes'},
+      {id:'dashboard',   label:'📊 Dashboard'},
     ]:[])
   ];
   document.getElementById('navbar').innerHTML=tabs.map(t=>
@@ -835,7 +875,7 @@ function buildNav(){
 }
 
 function showView(id){
-  ['notas','docentes','dashboard'].forEach(v=>{
+  ['notas','estudiantes','asignacion','docentes','dashboard'].forEach(v=>{
     const el=document.getElementById('view-'+v);
     const tab=document.getElementById('tab-'+v);
     if(el)el.classList.toggle('on',v===id);
@@ -843,6 +883,8 @@ function showView(id){
   });
   if(id==='dashboard')loadDashboard();
   if(id==='docentes')loadDocentesPanel();
+  if(id==='estudiantes')renderStudentManager();
+  if(id==='asignacion')renderAssignmentPanel();
 }
 
 // ══════════════════════════════════════════
@@ -866,9 +908,9 @@ function onAlumChange(){
 // ══════════════════════════════════════════
 //  COURSE CHIPS
 // ══════════════════════════════════════════
-// Course ownership & readonly state
-let courseOwner = null;   // name of whoever saved this course last
-let isReadOnly = false;   // true when viewing another teacher's course
+// Course assignment system
+let courseOwnerName = null;   // docente assigned to current course
+let courseAssignments = {};   // {courseId: docenteName} for current context
 
 // visible courses per user (loaded from supabase configuracion)
 let visibleCourseIds = COURSES.map(c=>c.id); // default: all visible
@@ -952,6 +994,21 @@ async function changeCourse(id){
 // ══════════════════════════════════════════
 //  LOAD GRADES FROM SUPABASE
 // ══════════════════════════════════════════
+async function loadCourseAssignments(){
+  const {grado,seccion}=getCtx();
+  try{
+    const key=`assign_${grado}_${seccion}`;
+    const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+    courseAssignments=data?JSON.parse(data.valor):{};
+  }catch(e){ courseAssignments={}; }
+}
+
+async function saveCourseAssignments(){
+  const {grado,seccion}=getCtx();
+  const key=`assign_${grado}_${seccion}`;
+  await db.from('configuracion').upsert({id:key,valor:JSON.stringify(courseAssignments),updated_at:new Date().toISOString()});
+}
+
 async function loadGrades(){
   const {grado,seccion,bimestre}=getCtx();
   setSyncState('saving','cargando...');
@@ -982,15 +1039,13 @@ async function loadGrades(){
       .maybeSingle();
     if(gr){
       grades=JSON.parse(gr.estudiante_nombre)||{};
-      courseOwner=gr.docente_nombre||null;
+      courseOwnerName=gr.docente_nombre||null;
     } else {
       grades={};
-      courseOwner=null;
+      courseOwnerName=null;
     }
-    // Director can always edit. Teachers can only edit if no owner OR they are the owner
-    isReadOnly = currentUser.rol !== 'director' &&
-                 courseOwner !== null &&
-                 courseOwner !== currentUser.nombre;
+    await loadCourseAssignments();
+    courseOwnerName = courseAssignments[activeCourse]||null;
     setSyncState('ok','sincronizado');
   }catch(e){
     setSyncState('error','error de red');
@@ -1007,7 +1062,12 @@ async function loadGrades(){
 //  SAVE TO SUPABASE
 // ══════════════════════════════════════════
 function scheduleSave(){
-  if(isReadOnly){ return; }  // never save if viewing another teacher's course
+  // Only save if director OR this is the teacher's own course
+  const owner=courseOwnerName;
+  const isDir=currentUser&&currentUser.rol==='director';
+  const isOwner=owner===currentUser?.nombre;
+  const isFree=!owner;
+  if(!isDir&&!isOwner&&!isFree)return;
   clearTimeout(saveTimer);
   setSyncState('saving','guardando...');
   showSaveBar('saving');
@@ -1060,20 +1120,67 @@ function showSaveBar(state){
 //  RENDER TABLE
 // ══════════════════════════════════════════
 function renderTable(){
-  // Readonly banner
+  // Course assignment banner
+  const saveWrap=document.getElementById('save-bar-wrap');
   const dlRow=document.getElementById('dl-row-teacher');
-  const existingBanner=document.getElementById('readonly-banner');
-  if(existingBanner)existingBanner.remove();
-  if(isReadOnly){
-    const banner=document.createElement('div');
-    banner.id='readonly-banner';
-    banner.className='readonly-banner';
-    banner.innerHTML=`⚠️ Este curso fue registrado por <strong style="margin:0 4px;">${courseOwner}</strong>. Solo puedes ver las notas, no editarlas.`;
-    document.getElementById('save-bar-wrap').after(banner);
-    if(dlRow)dlRow.style.display='none';
-  } else {
+  const oldBanner=document.getElementById('assign-banner');
+  if(oldBanner)oldBanner.remove();
+
+  const isDir=currentUser.rol==='director';
+  const myName=currentUser.nombre;
+  const owner=courseOwnerName;
+  const courseName=COURSES.find(c=>c.id===activeCourse)?.label||'';
+
+  let bannerHtml='';
+  let canEdit=true;
+
+  if(isDir){
+    // Director: show who owns the course, can always edit
+    if(owner){
+      bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-mine">
+        ✓ Curso asignado a: <strong style="margin:0 5px;">${owner}</strong>
+        <button class="btn-claim btn-claim-release" onclick="dirReleaseCourse('${activeCourse}')" style="margin-left:auto;">Quitar asignación</button>
+      </div>`;
+    } else {
+      bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-free">
+        Este curso no tiene docente asignado aún.
+      </div>`;
+    }
     if(dlRow)dlRow.style.display='flex';
+  } else {
+    // Docente
+    if(!owner){
+      // Free course — can claim
+      bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-free">
+        Este curso no tiene docente asignado.
+        <button class="btn-claim btn-claim-take" onclick="claimCourse('${activeCourse}')" style="margin-left:auto;">✋ Tomar este curso</button>
+      </div>`;
+      canEdit=true;
+      if(dlRow)dlRow.style.display='none';
+    } else if(owner===myName){
+      // Mine
+      bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-mine">
+        ✓ Este es tu curso — <strong style="margin:0 4px;">${courseName}</strong>
+        <button class="btn-claim btn-claim-release" onclick="releaseCourse('${activeCourse}')" style="margin-left:auto;">Liberar curso</button>
+      </div>`;
+      canEdit=true;
+      if(dlRow)dlRow.style.display='flex';
+    } else {
+      // Another teacher's course
+      bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-other">
+        ⚠️ Asignado a: <strong style="margin:0 5px;">${owner}</strong> — Solo lectura
+      </div>`;
+      canEdit=false;
+      if(dlRow)dlRow.style.display='none';
+    }
   }
+
+  if(bannerHtml){
+    const banner=document.createElement('div');
+    banner.innerHTML=bannerHtml;
+    saveWrap.after(banner.firstChild);
+  }
+
   const gRow=`
     <th rowspan="2" style="width:26px;text-align:center;background:var(--surf2);font-size:9px;font-weight:700;color:var(--text2);padding:5px 3px;border-bottom:2px solid var(--border);">#</th>
     <th rowspan="2" style="min-width:160px;text-align:left;background:var(--surf2);font-size:9px;font-weight:700;color:var(--text2);padding:5px 7px;border-bottom:2px solid var(--border);">APELLIDOS Y NOMBRES</th>
@@ -1096,12 +1203,12 @@ function renderTable(){
       const isLast=ci===8||ci===11||ci===12;
       return`<td style="text-align:center;${isLast?'border-right:2px solid var(--border2);':''}">
         <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
-          <input type="number" min="0" max="20" class="si ${tc} ${lv?'v'+lv:''} ${isReadOnly?'readonly':''}"
+          <input type="number" min="0" max="20" class="si ${tc} ${lv?'v'+lv:''}"
             value="${v}" placeholder="—"
             data-i="${i}" data-k="${col.key}"
-            ${isReadOnly?'readonly disabled':''}
-            oninput="${isReadOnly?'':'onScore(this)'}"
-            onkeydown="${isReadOnly?'':'navKey(event,'+i+',\''+col.key+'\')'}">
+            ${canEdit?'':'readonly style="pointer-events:none;background:var(--surf2)!important;color:var(--text3)!important;border-color:var(--border)!important;"'}
+            oninput="${canEdit?'onScore(this)':''}"
+            onkeydown="${canEdit?'navKey(event,'+i+',\''+col.key+'\')'}">
           <span class="ml ${lv?'ml'+lv:''}">${lv}</span>
         </div>
       </td>`;
@@ -1111,8 +1218,10 @@ function renderTable(){
       :`<span class="lb lb-e"><span class="ln">—</span><span class="ll">—</span></span>`;
     return`<tr>
       <td class="tcn">${i+1}</td>
-      <td class="tname ${isReadOnly?'readonly':''}"><input placeholder="Apellidos y nombres" value="${names[i]||''}"
-        data-ni="${i}" ${isReadOnly?'readonly disabled':''} oninput="${isReadOnly?'':'onName(this)'}" style="${isReadOnly?'pointer-events:none;color:var(--text2);':''}"></td>
+      <td class="tname"><input placeholder="Apellidos y nombres" value="${names[i]||''}"
+        data-ni="${i}"
+        ${isDir?'':'readonly style="pointer-events:none;color:var(--text2);background:var(--surf2);"'}
+        oninput="${isDir?'onName(this)':''}"></td>
       ${cells}
       <td style="text-align:center;">${badge}</td>
     </tr>`;
@@ -1365,6 +1474,256 @@ async function loadDashboard(){
 }
 
 
+
+
+// ══════════════════════════════════════════
+//  COURSE CLAIM / RELEASE
+// ══════════════════════════════════════════
+async function claimCourse(cid){
+  if(courseAssignments[cid]){
+    toast('Este curso ya tiene docente asignado','warn'); return;
+  }
+  courseAssignments[cid]=currentUser.nombre;
+  courseOwnerName=currentUser.nombre;
+  await saveCourseAssignments();
+  toast(`✓ Tomaste el curso: ${COURSES.find(c=>c.id===cid)?.label||cid}`,'ok');
+  renderTable();
+  const dlRow=document.getElementById('dl-row-teacher');
+  if(dlRow)dlRow.style.display='flex';
+}
+
+async function releaseCourse(cid){
+  if(!confirm('¿Liberar este curso? Podrá ser tomado por otro docente.'))return;
+  delete courseAssignments[cid];
+  courseOwnerName=null;
+  await saveCourseAssignments();
+  toast('Curso liberado','warn');
+  renderTable();
+}
+
+async function dirReleaseCourse(cid){
+  if(!confirm('¿Quitar la asignación de este curso?'))return;
+  const prev=courseAssignments[cid];
+  delete courseAssignments[cid];
+  courseOwnerName=null;
+  await saveCourseAssignments();
+  toast(`Asignación de ${prev||'docente'} eliminada`,'ok');
+  renderTable();
+  renderAssignmentPanel();
+}
+
+async function dirAssignCourse(cid, docenteName){
+  courseAssignments[cid]=docenteName;
+  await saveCourseAssignments();
+  toast(`${COURSES.find(c=>c.id===cid)?.label||cid} asignado a ${docenteName}`,'ok');
+  renderAssignmentPanel();
+  if(activeCourse===cid){ courseOwnerName=docenteName; renderTable(); }
+}
+
+// ══════════════════════════════════════════
+//  STUDENT MANAGER (Director only)
+// ══════════════════════════════════════════
+let studMgrNames=[];
+let studMgrCtx={grado:'',seccion:''};
+
+async function renderStudentManager(){
+  const grado=document.getElementById('sel-grado').value;
+  const seccion=document.getElementById('sel-seccion').value;
+  studMgrCtx={grado,seccion};
+  document.getElementById('stud-mgr-content').innerHTML='<div class="empty">Cargando estudiantes...</div>';
+
+  // Load names from DB
+  try{
+    const {data:nm}=await db.from('registros')
+      .select('estudiante_nombre')
+      .eq('grado',grado).eq('seccion',seccion)
+      .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot')
+      .maybeSingle();
+    if(nm){ const p=JSON.parse(nm.estudiante_nombre); studMgrNames=[...(p.names||[])]; }
+    else studMgrNames=[];
+  }catch(e){studMgrNames=[];}
+
+  buildStudentMgrUI();
+}
+
+function buildStudentMgrUI(){
+  const {grado,seccion}=studMgrCtx;
+  const rows=studMgrNames.map((n,i)=>`
+    <div class="stud-input-row" id="stud-row-${i}">
+      <span class="stud-num">${i+1}</span>
+      <input value="${n||''}" placeholder="Apellidos y nombres" data-si="${i}"
+        oninput="studMgrNames[${i}]=this.value">
+      <button class="btn-del-stud" onclick="removeStudent(${i})" title="Eliminar">✕</button>
+    </div>`).join('');
+
+  document.getElementById('stud-mgr-content').innerHTML=`
+    <div class="stud-mgr">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <h4>📋 Lista de estudiantes — ${grado} Grado · Sección ${seccion}</h4>
+        <div style="display:flex;gap:8px;">
+          <button onclick="sortStudentsMgr()" class="btn btn-ghost" style="font-size:12px;padding:6px 12px;">A–Z Ordenar</button>
+          <button onclick="saveStudentList()" class="btn btn-green" style="font-size:12px;padding:6px 14px;border:none;">💾 Guardar lista</button>
+        </div>
+      </div>
+      <div style="margin-bottom:8px;font-size:11px;color:var(--text3);">
+        ${studMgrNames.length} estudiante(s) registrados · Solo el Director puede modificar esta lista.
+      </div>
+      <div id="stud-rows">${rows}</div>
+      <div class="stud-input-row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <span class="stud-num">+</span>
+        <input id="new-stud-input" placeholder="Apellidos y nombres del nuevo estudiante" onkeydown="if(event.key==='Enter')addStudent()">
+        <button class="btn-add-stud" onclick="addStudent()">Agregar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="cf"><label>Ver grado</label>
+          <select onchange="document.getElementById('sel-grado').value=this.value;renderStudentManager();">
+            ${['1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta'].map(g=>`<option ${g===studMgrCtx.grado?'selected':''}>${g}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cf"><label>Ver sección</label>
+          <select onchange="document.getElementById('sel-seccion').value=this.value;renderStudentManager();">
+            ${['A','B','C','D','E','Única'].map(s=>`<option ${s===studMgrCtx.seccion?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>`;
+}
+
+function addStudent(){
+  const inp=document.getElementById('new-stud-input');
+  const name=inp.value.trim(); if(!name){toast('Escribe el nombre primero','warn');return;}
+  studMgrNames.push(name); inp.value=''; buildStudentMgrUI();
+}
+function removeStudent(i){
+  if(!confirm(`¿Eliminar a "${studMgrNames[i]}"?`))return;
+  studMgrNames.splice(i,1); buildStudentMgrUI();
+}
+function sortStudentsMgr(){
+  studMgrNames=studMgrNames.filter(n=>n.trim()!=='').sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+  buildStudentMgrUI(); toast('Lista ordenada A–Z','ok');
+}
+async function saveStudentList(){
+  const {grado,seccion}=studMgrCtx;
+  const bimestre=document.getElementById('sel-bimestre').value;
+  try{
+    await db.from('registros').delete()
+      .eq('grado',grado).eq('seccion',seccion)
+      .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot');
+    await db.from('registros').insert({
+      grado,seccion,bimestre:'all',curso_id:'_names',
+      estudiante_idx:-1,columna_key:'snapshot',
+      estudiante_nombre:JSON.stringify({names:studMgrNames,numStudents:studMgrNames.length}),
+      docente_nombre:currentUser.nombre,
+      updated_at:new Date().toISOString()
+    });
+    // Update live table if same context
+    if(grado===document.getElementById('sel-grado').value &&
+       seccion===document.getElementById('sel-seccion').value){
+      names=[...studMgrNames];
+      numStudents=studMgrNames.length;
+      document.getElementById('sel-nalum').value=numStudents;
+      renderTable();
+    }
+    toast(`✓ Lista guardada — ${studMgrNames.length} estudiantes`,'ok');
+  }catch(e){toast('Error al guardar: '+e.message,'err');}
+}
+
+// ══════════════════════════════════════════
+//  ASSIGNMENT PANEL (Director only)
+// ══════════════════════════════════════════
+async function renderAssignmentPanel(){
+  const grado=document.getElementById('sel-grado').value;
+  const seccion=document.getElementById('sel-seccion').value;
+  document.getElementById('assign-content').innerHTML='<div class="empty">Cargando asignaciones...</div>';
+
+  // Load assignments for current grade/section
+  const key=`assign_${grado}_${seccion}`;
+  let assignments={};
+  try{
+    const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+    if(data)assignments=JSON.parse(data.valor)||{};
+  }catch(e){}
+
+  // Load docentes
+  const {data:docs}=await db.from('docentes').select('nombre,rol').order('nombre');
+  const docentes=(docs||[]).filter(d=>d.rol==='docente');
+
+  const courseCards=COURSES.map(c=>{
+    const owner=assignments[c.id];
+    return`<div class="assign-card">
+      <h5>${c.label} <span style="font-size:9px;color:var(--text3);">(${c.short})</span></h5>
+      <div class="assign-row">
+        <span class="assign-teacher ${owner?'taken':'free'}">${owner||'Sin asignar'}</span>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          ${owner?`<button class="btn-reassign" onclick="dirReleaseCoursePanel('${c.id}','${grado}','${seccion}')">Quitar</button>`:''}
+          <select onchange="if(this.value)dirAssignCoursePanel('${c.id}','${grado}','${seccion}',this.value);this.value='';"
+            style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:var(--surf);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;">
+            <option value="">Asignar a...</option>
+            ${docentes.map(d=>`<option value="${d.nombre}">${d.nombre}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('assign-content').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div class="sec-title">🗂 Asignación de cursos a docentes</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">${grado} Grado · Sección ${seccion} · Asigna cada curso a su docente correspondiente.</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div class="cf" style="margin-bottom:0;"><label style="font-size:10px;">Grado</label>
+          <select onchange="document.getElementById('sel-grado').value=this.value;renderAssignmentPanel();">
+            ${['1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta'].map(g=>`<option ${g===grado?'selected':''}>${g}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cf" style="margin-bottom:0;"><label style="font-size:10px;">Sección</label>
+          <select onchange="document.getElementById('sel-seccion').value=this.value;renderAssignmentPanel();">
+            ${['A','B','C','D','E','Única'].map(s=>`<option ${s===seccion?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="assign-grid">${courseCards}</div>
+    <p style="font-size:11px;color:var(--text3);margin-top:12px;">* Los docentes también pueden tomar cursos sin asignar desde la pestaña "Ingreso de notas".</p>`;
+}
+
+async function dirAssignCoursePanel(cid,grado,seccion,docenteName){
+  const key=`assign_${grado}_${seccion}`;
+  let assignments={};
+  try{
+    const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+    if(data)assignments=JSON.parse(data.valor)||{};
+  }catch(e){}
+  assignments[cid]=docenteName;
+  await db.from('configuracion').upsert({id:key,valor:JSON.stringify(assignments),updated_at:new Date().toISOString()});
+  toast(`${COURSES.find(c=>c.id===cid)?.label||cid} → ${docenteName}`,'ok');
+  renderAssignmentPanel();
+  if(activeCourse===cid&&grado===document.getElementById('sel-grado').value){
+    courseAssignments=assignments; courseOwnerName=docenteName; renderTable();
+  }
+}
+
+async function dirReleaseCoursePanel(cid,grado,seccion){
+  if(!confirm('¿Quitar la asignación de este curso?'))return;
+  const key=`assign_${grado}_${seccion}`;
+  let assignments={};
+  try{
+    const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+    if(data)assignments=JSON.parse(data.valor)||{};
+  }catch(e){}
+  delete assignments[cid];
+  await db.from('configuracion').upsert({id:key,valor:JSON.stringify(assignments),updated_at:new Date().toISOString()});
+  toast('Asignación eliminada','ok');
+  renderAssignmentPanel();
+  if(activeCourse===cid&&grado===document.getElementById('sel-grado').value){
+    courseAssignments=assignments; courseOwnerName=null; renderTable();
+  }
+}
 
 // ══════════════════════════════════════════
 //  ORDENAR ALFABÉTICAMENTE
