@@ -1208,7 +1208,7 @@ function renderTable(){
             data-i="${i}" data-k="${col.key}"
             ${canEdit?'':'readonly style="pointer-events:none;background:var(--surf2)!important;color:var(--text3)!important;border-color:var(--border)!important;"'}
             oninput="${canEdit?'onScore(this)':''}"
-            onkeydown="${canEdit?'navKey(event,'+i+',\''+col.key+'\')'}">
+            onkeydown="${canEdit?'navKey(event,'+i+',"'+col.key+'")':''}">
           <span class="ml ${lv?'ml'+lv:''}">${lv}</span>
         </div>
       </td>`;
@@ -1729,7 +1729,11 @@ async function dirReleaseCoursePanel(cid,grado,seccion){
 //  ORDENAR ALFABÉTICAMENTE
 // ══════════════════════════════════════════
 function sortAlphabetically(){
-  if(isReadOnly){ toast('No puedes modificar este curso','warn'); return; }
+  const owner=courseOwnerName;
+  const isDir=currentUser&&currentUser.rol==='director';
+  const isOwner=owner===currentUser?.nombre;
+  const isFree=!owner;
+  if(!isDir&&!isOwner&&!isFree){ toast('No puedes modificar este curso','warn'); return; }
   // Build student array with their grades
   const students = Array.from({length:numStudents}, (_,i) => ({
     name: names[i]||'',
