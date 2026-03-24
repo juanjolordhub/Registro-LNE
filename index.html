@@ -240,6 +240,18 @@ tr:hover td{background:var(--surf3);}
 .toolbar-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
 .toolbar-row h3{font-size:15px;font-weight:800;flex:1;}
 
+/* OBSERVACIÓN POR CURSO */
+.obs-box{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px;}
+.obs-box-header{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;}
+.obs-box textarea{width:100%;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);background:var(--bg);resize:vertical;min-height:52px;max-height:140px;outline:none;transition:border .15s;line-height:1.5;}
+.obs-box textarea:focus{border-color:var(--accent);}
+.obs-box textarea::placeholder{color:var(--text3);font-style:italic;}
+.obs-save-row{display:flex;align-items:center;gap:8px;}
+.obs-save-btn{padding:4px 14px;background:var(--accent);border:none;border-radius:6px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:opacity .15s;}
+.obs-save-btn:hover{opacity:.85;}
+.obs-saved-lbl{font-size:10px;color:var(--green);font-weight:700;opacity:0;transition:opacity .4s;}
+.obs-saved-lbl.show{opacity:1;}
+
 
 /* MANAGE COURSES MODAL */
 .course-toggle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;}
@@ -435,6 +447,21 @@ tr:hover td{background:var(--surf3);}
       </button>
     </div>
     <div class="stats-row" id="stats-row"></div>
+
+    <!-- OBSERVACIÓN POR CURSO -->
+    <div class="obs-box" id="obs-box" style="display:none;">
+      <div class="obs-box-header">
+        📝 Observaciones del curso
+        <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px;">— recordatorio interno del docente</span>
+      </div>
+      <textarea id="obs-textarea" placeholder="Ej: Recuperación pendiente para 3 alumnos · Entrega de trabajos semana próxima · Revisar notas de Ev2..."></textarea>
+      <div class="obs-save-row">
+        <button class="obs-save-btn" onclick="saveObservacion()">💾 Guardar nota</button>
+        <span class="obs-saved-lbl" id="obs-saved-lbl">✓ Guardado</span>
+        <span style="font-size:10px;color:var(--text3);margin-left:auto;" id="obs-meta"></span>
+      </div>
+    </div>
+
     <div class="tbl-wrap" id="tbl-wrap">
       <div class="empty">Selecciona un curso para comenzar.</div>
     </div>
@@ -1053,9 +1080,53 @@ async function loadGrades(){
   }
   renderTable();
   renderStats();
+  loadObservacion();
   // show download row
   const dlRow = document.getElementById('dl-row-teacher');
   if(dlRow) dlRow.style.display='flex';
+}
+
+// ══════════════════════════════════════════
+//  OBSERVACIÓN POR CURSO
+// ══════════════════════════════════════════
+let obsTimer = null;
+
+async function loadObservacion(){
+  const {grado,seccion,bimestre}=getCtx();
+  const obsBox=document.getElementById('obs-box');
+  const ta=document.getElementById('obs-textarea');
+  const meta=document.getElementById('obs-meta');
+  if(obsBox) obsBox.style.display='flex';
+  if(ta) ta.value='';
+  if(meta) meta.textContent='';
+  try{
+    const key=`obs_${grado}_${seccion}_${bimestre}_${activeCourse}`;
+    const {data}=await db.from('configuracion').select('valor,updated_at').eq('id',key).maybeSingle();
+    if(data&&data.valor){
+      if(ta) ta.value=data.valor;
+      if(meta&&data.updated_at){
+        const d=new Date(data.updated_at);
+        meta.textContent='Última edición: '+d.toLocaleDateString('es-PE')+' '+d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+      }
+    }
+  }catch(e){}
+}
+
+async function saveObservacion(){
+  const {grado,seccion,bimestre}=getCtx();
+  const ta=document.getElementById('obs-textarea');
+  const lbl=document.getElementById('obs-saved-lbl');
+  const meta=document.getElementById('obs-meta');
+  const key=`obs_${grado}_${seccion}_${bimestre}_${activeCourse}`;
+  const valor=ta?ta.value:'';
+  try{
+    await db.from('configuracion').upsert({id:key,valor,updated_at:new Date().toISOString()});
+    if(lbl){lbl.classList.add('show');setTimeout(()=>lbl.classList.remove('show'),2500);}
+    if(meta){
+      const d=new Date();
+      meta.textContent='Última edición: '+d.toLocaleDateString('es-PE')+' '+d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+    }
+  }catch(e){ toast('Error al guardar observación','err'); }
 }
 
 // ══════════════════════════════════════════
