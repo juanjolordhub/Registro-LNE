@@ -305,6 +305,17 @@ tr:hover td{background:var(--surf3);}
 .si-dec.vC{background:var(--c-bg)!important;color:var(--c);border-color:var(--c-br);}
 
 
+
+/* NOTES BOX */
+.notes-box{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);margin-top:14px;}
+.notes-box-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.notes-box-hdr h4{font-size:12px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:6px;}
+.notes-ta{width:100%;min-height:110px;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);background:var(--bg);resize:vertical;outline:none;line-height:1.6;transition:border .15s;}
+.notes-ta:focus{border-color:var(--accent);}
+.notes-saved{font-size:11px;color:var(--ad);font-weight:700;display:none;}
+.btn-save-notes{padding:6px 14px;background:var(--accent);border:none;border-radius:7px;font-size:12px;font-weight:700;color:white;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;}
+.btn-save-notes:hover{background:var(--accent-d);}
+
 /* STATS WRAP BELOW TABLE */
 .stats-wrap-row{display:grid;grid-template-columns:250px 1fr;gap:12px;margin-top:16px;align-items:start;}
 .sc-card2{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);}
@@ -488,6 +499,17 @@ tr:hover td{background:var(--surf3);}
       <div class="empty">Selecciona un curso para comenzar.</div>
     </div>
     <div id="stats-wrap-course"></div>
+    <div class="notes-box" id="notes-box" style="display:none;">
+      <div class="notes-box-hdr">
+        <h4>📝 Observaciones del curso — <span id="notes-course-label"></span></h4>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="notes-saved" id="notes-saved">✓ Guardado</span>
+          <button class="btn-save-notes" onclick="saveNotes()">Guardar notas</button>
+        </div>
+      </div>
+      <textarea class="notes-ta" id="notes-ta"
+        placeholder="Escribe aquí tus observaciones, pendientes, acuerdos de clase, alumnos a reforzar..."></textarea>
+    </div>
   </div>
 
   <!-- VIEW: ESTUDIANTES (Director only) -->
@@ -1132,6 +1154,7 @@ async function changeCourse(id){
   activeCourse=id;
   renderCourseChips();
   await loadGrades();
+  loadNotes();
 }
 
 // ══════════════════════════════════════════
@@ -1204,6 +1227,7 @@ async function loadGrades(){
   }
   renderTable();
   renderStats();
+  loadNotes();
 }
 
 // ══════════════════════════════════════════
@@ -2159,6 +2183,53 @@ function sortAlphabetically(){
   scheduleSave();
   scheduleBimSave();
   toast('Lista ordenada de A a Z','ok');
+}
+
+
+// ══════════════════════════════════════════
+//  NOTAS / OBSERVACIONES POR CURSO
+// ══════════════════════════════════════════
+let notesTimer = null;
+
+async function loadNotes(){
+  const {grado,seccion,bimestre} = getCtx();
+  const key = `notes_${grado}_${seccion}_${bimestre}_${activeCourse}`;
+  const box = document.getElementById('notes-box');
+  const ta  = document.getElementById('notes-ta');
+  const lbl = document.getElementById('notes-course-label');
+  if(!box||!ta) return;
+
+  box.style.display = 'block';
+  lbl.textContent = COURSES.find(c=>c.id===activeCourse)?.label||'';
+  ta.value = '';
+
+  try{
+    const {data} = await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+    ta.value = data?.valor||'';
+  }catch(e){}
+
+  // Auto-save on typing
+  ta.oninput = () => {
+    clearTimeout(notesTimer);
+    document.getElementById('notes-saved').style.display='none';
+    notesTimer = setTimeout(saveNotes, 1500);
+  };
+}
+
+async function saveNotes(){
+  const {grado,seccion,bimestre} = getCtx();
+  const key = `notes_${grado}_${seccion}_${bimestre}_${activeCourse}`;
+  const ta  = document.getElementById('notes-ta');
+  if(!ta) return;
+  try{
+    await db.from('configuracion').upsert({
+      id: key,
+      valor: ta.value,
+      updated_at: new Date().toISOString()
+    });
+    const saved = document.getElementById('notes-saved');
+    if(saved){ saved.style.display='inline'; setTimeout(()=>saved.style.display='none', 2500); }
+  }catch(e){ toast('Error al guardar notas','err'); }
 }
 
 // ══════════════════════════════════════════
