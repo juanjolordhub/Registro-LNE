@@ -455,14 +455,21 @@ tr:hover td{background:var(--surf3);}
   <div class="view" id="view-notas">
     <div class="scale-row">
       <b style="font-size:12px;">Escala CNB 2026:</b>
-      <span class="sc-p"><span class="sc sc-AD">AD</span>&nbsp;18–20</span>
+      <span class="sc-p"><span class="sc sc-AD">AD</span>&nbsp;18–20 Logro Destacado</span>
       <span style="color:var(--border2);">|</span>
-      <span class="sc-p"><span class="sc sc-A">A</span>&nbsp;14–17</span>
+      <span class="sc-p"><span class="sc sc-A">A</span>&nbsp;14–17 Logro Esperado</span>
       <span style="color:var(--border2);">|</span>
-      <span class="sc-p"><span class="sc sc-B">B</span>&nbsp;11–13</span>
+      <span class="sc-p"><span class="sc sc-B">B</span>&nbsp;11–13 En Proceso</span>
       <span style="color:var(--border2);">|</span>
-      <span class="sc-p"><span class="sc sc-C">C</span>&nbsp;00–10</span>
-      <span style="margin-left:auto;font-size:11px;color:var(--text3);">Fórmula: Sem+Expo+Libro <b>65%</b> · E.Bimestral <b>10% c/u</b> · Comportamiento <b>5%</b></span>
+      <span class="sc-p"><span class="sc sc-C">C</span>&nbsp;00–10 En Inicio</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--accent-l);border:1px solid var(--accent);border-radius:7px;padding:4px 10px;">
+        <span style="font-size:10px;font-weight:700;color:var(--accent);">Ponderación:</span>
+        <span style="font-size:10px;color:var(--accent);">Sem+Expo+Libro <b>65%</b></span>
+        <span style="color:var(--border2);">·</span>
+        <span style="font-size:10px;color:var(--accent);">E.Bimestral <b>10% c/u</b></span>
+        <span style="color:var(--border2);">·</span>
+        <span style="font-size:10px;color:var(--accent);">Comportamiento <b>5%</b></span>
+      </span>
     </div>
     <div class="ctx-row">
       <div class="cf"><label>Grado</label>
@@ -2311,34 +2318,39 @@ let boletaNames = [];
 let boletaProfiles = [];
 let boletaLoadedBim = [];
 
+// State para boletas independiente del contexto de notas
+let boletaCtxGrado   = null;
+let boletaCtxSeccion = null;
+let boletaCtxBim     = 'I';
+
 async function renderBoletasView(){
+  // Inicializar con el contexto actual solo la primera vez
+  if(!boletaCtxGrado)   boletaCtxGrado   = document.getElementById('sel-grado').value;
+  if(!boletaCtxSeccion) boletaCtxSeccion = document.getElementById('sel-seccion').value;
+
   const cont = document.getElementById('boletas-content');
-  cont.innerHTML = `<div class="empty">Cargando datos...</div>`;
+  const bimVisible = boletaMode === 'bimestre';
 
-  const grado   = document.getElementById('sel-grado').value;
-  const seccion = document.getElementById('sel-seccion').value;
-  const bimestre= document.getElementById('sel-bimestre').value;
-
-  // Build controls UI
   cont.innerHTML = `
     <div class="boleta-controls">
       <h3>📄 Boletas de notas</h3>
       <div class="ctx-row" style="margin-bottom:12px;">
         <div class="cf"><label>Grado</label>
-          <select id="bol-grado" onchange="renderBoletasView()">
+          <select id="bol-grado" onchange="onBoletaGradoChange()">
             ${['1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta']
-              .map(g=>`<option ${g===grado?'selected':''}>${g}</option>`).join('')}
+              .map(g=>`<option ${g===boletaCtxGrado?'selected':''}>${g}</option>`).join('')}
           </select>
         </div>
         <div class="cf"><label>Sección</label>
-          <select id="bol-seccion" onchange="renderBoletasView()">
+          <select id="bol-seccion" onchange="onBoletaSeccionChange()">
             ${['A','B','C','D','E','Única']
-              .map(s=>`<option ${s===seccion?'selected':''}>${s}</option>`).join('')}
+              .map(s=>`<option ${s===boletaCtxSeccion?'selected':''}>${s}</option>`).join('')}
           </select>
         </div>
-        <div class="cf" id="bol-bim-wrap"><label>Bimestre</label>
-          <select id="bol-bimestre">
-            <option>I</option><option>II</option><option>III</option><option>IV</option>
+        <div class="cf" style="${bimVisible?'':'opacity:.35;pointer-events:none;'}">
+          <label>Bimestre</label>
+          <select id="bol-bimestre" onchange="onBoletaBimChange()">
+            ${['I','II','III','IV'].map(b=>`<option ${b===boletaCtxBim?'selected':''}>${b}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -2353,8 +2365,11 @@ async function renderBoletasView(){
 
       <div class="boleta-btn-row">
         <button class="btn-boleta btn-boleta-all" onclick="printAllBoletas()">
-          🖨️ Imprimir TODAS las boletas del grado/sección
+          🖨️ Imprimir TODAS las boletas — un solo PDF
         </button>
+        <div style="font-size:11px;color:var(--text3);align-self:center;">
+          O haz clic en la tarjeta de un alumno para imprimir solo la suya
+        </div>
       </div>
     </div>
 
@@ -2362,26 +2377,44 @@ async function renderBoletasView(){
       <div class="empty">Cargando estudiantes...</div>
     </div>`;
 
-  // Sync selectors to main context
-  document.getElementById('bol-grado').value   = grado;
-  document.getElementById('bol-seccion').value = seccion;
-  document.getElementById('sel-grado').value   = grado;
-  document.getElementById('sel-seccion').value = seccion;
+  await loadAllBoletaData();
+  renderStudentCards();
+}
 
-  // Load all data
+function onBoletaGradoChange(){
+  boletaCtxGrado = document.getElementById('bol-grado').value;
+  reloadBoletaData();
+}
+function onBoletaSeccionChange(){
+  boletaCtxSeccion = document.getElementById('bol-seccion').value;
+  reloadBoletaData();
+}
+function onBoletaBimChange(){
+  boletaCtxBim = document.getElementById('bol-bimestre').value;
+  renderStudentCards(); // no need to reload all data, just re-render
+}
+async function reloadBoletaData(){
+  document.getElementById('boleta-student-list').innerHTML='<div class="empty">Cargando...</div>';
   await loadAllBoletaData();
   renderStudentCards();
 }
 
 function setBoletaMode(mode){
   boletaMode = mode;
+  // preserve current bol-grado/seccion/bim values before re-render
+  const bolG = document.getElementById('bol-grado')?.value;
+  const bolS = document.getElementById('bol-seccion')?.value;
+  const bolB = document.getElementById('bol-bimestre')?.value;
+  if(bolG) boletaCtxGrado=bolG;
+  if(bolS) boletaCtxSeccion=bolS;
+  if(bolB) boletaCtxBim=bolB;
   renderBoletasView();
 }
 
 function getBoletaCtx(){
-  const g = document.getElementById('bol-grado')?.value || document.getElementById('sel-grado').value;
-  const s = document.getElementById('bol-seccion')?.value || document.getElementById('sel-seccion').value;
-  const b = document.getElementById('bol-bimestre')?.value || document.getElementById('sel-bimestre').value;
+  const g = boletaCtxGrado   || document.getElementById('sel-grado').value;
+  const s = boletaCtxSeccion || document.getElementById('sel-seccion').value;
+  const b = boletaCtxBim     || document.getElementById('sel-bimestre').value;
   return {grado:g, seccion:s, bimestre:b};
 }
 
