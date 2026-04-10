@@ -441,7 +441,7 @@ tr:hover td{background:var(--surf3);}
       <span class="sc-p"><span class="sc sc-B">B</span>&nbsp;11–13</span>
       <span style="color:var(--border2);">|</span>
       <span class="sc-p"><span class="sc sc-C">C</span>&nbsp;00–10</span>
-      <span style="margin-left:auto;font-size:11px;color:var(--text3);">Pond: Sem×1 · Ev×1.5 · Comp×1</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--text3);">Fórmula: Sem+Expo+Libro <b>65%</b> · E.Bimestral <b>10% c/u</b> · Comportamiento <b>5%</b></span>
     </div>
     <div class="ctx-row">
       <div class="cf"><label>Grado</label>
@@ -789,28 +789,56 @@ let dashData = {};
 // ══════════════════════════════════════════
 //  ESCALA
 // ══════════════════════════════════════════
+// ── Conversión cualitativa libro ──
+function qualToNum(q){ return q==='C'?20:q==='M'?10:q==='N'?0:null; }
+
+// ── Promedio ponderado CNB 2026 ──
+// 65% Semanas+Expo+Libro · 30% Eval.Bimestral (3×10%) · 5% Comportamiento
 function wAvg(i, bimData){
-  let sw=0,sv=0;
-  // Course numeric cols
-  COLS_NUM.forEach(c=>{
-    const v=(grades[i]||{})[c.key];
-    if(v!==''&&v!==undefined&&v!==null){
-      const n=parseFloat(v);
-      if(!isNaN(n)){sv+=n*c.w;sw+=c.w;}
-    }
+  // ── Grupo 1: Semanas + Expo + Libro = 65% ──
+  let g1sum=0, g1cnt=0;
+  // Semanas numéricas
+  COLS_SEM.filter(c=>!c.qual).forEach(c=>{
+    const v=parseFloat((grades[i]||{})[c.key]);
+    if(!isNaN(v)&&(grades[i]||{})[c.key]!==''){g1sum+=v;g1cnt++;}
   });
-  // Bimestral shared cols
+  // Exposiciones
+  COLS_EXP.forEach(c=>{
+    const v=parseFloat((grades[i]||{})[c.key]);
+    if(!isNaN(v)&&(grades[i]||{})[c.key]!==''){g1sum+=v;g1cnt++;}
+  });
+  // Avance del libro (cualitativo → numérico)
+  COLS_QUAL.forEach(c=>{
+    const q=(grades[i]||{})[c.key]||'';
+    const n=qualToNum(q);
+    if(n!==null){g1sum+=n;g1cnt++;}
+  });
+  const g1avg = g1cnt>0 ? g1sum/g1cnt : null;
+
+  // ── Grupo 2: Evaluaciones Bimestrales = 10% c/u ──
+  const bimVals=[];
   if(bimData){
     COLS_BIM.forEach(c=>{
-      const v=(bimData[i]||{})[c.key];
-      if(v!==''&&v!==undefined&&v!==null){
-        const n=parseFloat(v);
-        if(!isNaN(n)){sv+=n*c.w;sw+=c.w;}
-      }
+      const v=parseFloat((bimData[i]||{})[c.key]);
+      if(!isNaN(v)&&(bimData[i]||{})[c.key]!=='') bimVals.push(v);
     });
   }
-  if(!sw)return null;
-  return Math.round((sv/sw)*10)/10; // 2 decimals
+
+  // ── Grupo 3: Comportamiento = 5% ──
+  const cpv=parseFloat((grades[i]||{}).cp);
+  const cpNum=(!isNaN(cpv)&&(grades[i]||{}).cp!=='')?cpv:null;
+
+  // ── Fórmula ponderada ──
+  // Solo calcular si hay al menos algo en grupo 1
+  if(g1avg===null&&!bimVals.length&&cpNum===null) return null;
+
+  let totalW=0, totalV=0;
+  if(g1avg!==null){totalV+=g1avg*65;totalW+=65;}
+  bimVals.forEach(v=>{totalV+=v*10;totalW+=10;});
+  if(cpNum!==null){totalV+=cpNum*5;totalW+=5;}
+
+  if(!totalW) return null;
+  return Math.round((totalV/totalW)*10)/10;
 }
 function toLetter(v){
   if(v===''||v===null||v===undefined)return '';
@@ -1342,7 +1370,7 @@ function renderTable(){
     <th class="th-g gs" colspan="18" style="border-right:2px solid var(--border2);">Notas Semanales + Avance del Libro</th>
     <th class="th-g" colspan="3" style="background:#E8F4FB;color:#1A5AA0;border-right:2px solid var(--border2);">Exposiciones / T. Grupal</th>
     <th class="th-g" colspan="1" style="background:#F4EEFF;color:#5B2EA0;border-right:2px solid var(--border2);">Comp.</th>
-    <th class="th-g" colspan="3" style="background:#FFF5E0;color:#8A5000;">Evaluación Bimestral <span class="bim-note">General</span></th>
+    <th class="th-g" colspan="3" style="background:#FFF5E0;color:#8A5000;">Evaluación Bimestral <span class="bim-note">General · Solo Director</span></th>
     <th rowspan="3" class="th-g gl" style="min-width:58px;">LOGRO</th>`;
 
   // Week subheaders
@@ -1418,14 +1446,16 @@ function renderTable(){
       </div>
     </td>`;
 
-    // Bimestrales (shared — any docente can enter, director too)
+    // Bimestrales — SOLO Director puede editar
+    const canEditBim=isDir;
     const bimCells=COLS_BIM.map((col,bi)=>{
       const v=(bimGrades[i]||{})[col.key]??''; const lv=toLetter(v);
+      const bimRattr=canEditBim?'':'readonly style="pointer-events:none;background:var(--surf2)!important;color:var(--text3)!important;border-style:dashed;"';
       return`<td style="text-align:center;padding:3px 2px;border-left:${bi===0?'2px':'1px'} solid var(--b-br);">
         <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
           <input type="number" min="0" max="20" step="0.1" class="si-dec t-bim ${lv?'v'+lv:''}"
-            value="${v}" placeholder="—" data-i="${i}" data-k="${col.key}" data-src="bim"
-            oninput="onScoreBim(this)">
+            value="${v}" placeholder="${canEditBim?'—':'🔒'}" data-i="${i}" data-k="${col.key}" data-src="bim"
+            ${bimRattr} oninput="${canEditBim?'onScoreBim(this)':''}">
           <span class="ml ${lv?'ml'+lv:''}">${lv}</span>
         </div>
       </td>`;
