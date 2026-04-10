@@ -309,6 +309,27 @@ tr:hover td{background:var(--surf3);}
 
 
 
+
+/* ── BOLETAS VIEW ── */
+.boleta-controls{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;box-shadow:var(--sh);}
+.boleta-controls h3{font-size:14px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.boleta-btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+.btn-boleta{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;gap:6px;transition:all .15s;}
+.btn-boleta-all{background:var(--accent);border-color:var(--accent);color:white;}
+.btn-boleta-all:hover{background:var(--accent-d);}
+.btn-boleta-one{background:var(--surf);border-color:var(--border2);color:var(--text2);}
+.btn-boleta-one:hover{background:var(--surf2);}
+.boleta-mode-row{display:flex;gap:8px;margin-bottom:12px;}
+.boleta-mode-btn{padding:7px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surf);color:var(--text2);font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;}
+.boleta-mode-btn.active{background:var(--accent-l);border-color:var(--accent);color:var(--accent);}
+.boleta-preview-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:14px;}
+.boleta-preview-card{background:var(--surf);border:1.5px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s;}
+.boleta-preview-card:hover{border-color:var(--accent);background:var(--accent-l);}
+.bpc-name{font-size:13px;font-weight:800;margin-bottom:4px;}
+.bpc-info{font-size:11px;color:var(--text2);}
+.bpc-scores{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.bpc-score{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+
 /* NOTES BOX */
 .notes-box{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);margin-top:14px;}
 .notes-box-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
@@ -523,6 +544,11 @@ tr:hover td{background:var(--surf3);}
   <!-- VIEW: ASIGNACIÓN DE CURSOS (Director only) -->
   <div class="view" id="view-asignacion">
     <div id="assign-content"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <!-- VIEW: BOLETAS -->
+  <div class="view" id="view-boletas">
+    <div id="boletas-content"></div>
   </div>
 
   <!-- VIEW: DOCENTES -->
@@ -1059,6 +1085,7 @@ function buildNav(){
   const tabs=[
     {id:'notas',   label:'📝 Ingreso de notas'},
     ...(currentUser.rol==='director'?[
+      {id:'boletas', label:'📄 Boletas de notas'},
       {id:'estudiantes', label:'📋 Gestionar estudiantes'},
       {id:'asignacion',  label:'🗂 Asignar cursos'},
       {id:'docentes',    label:'👥 Gestionar docentes'},
@@ -1071,7 +1098,7 @@ function buildNav(){
 }
 
 function showView(id){
-  ['notas','estudiantes','asignacion','docentes','dashboard'].forEach(v=>{
+  ['notas','boletas','estudiantes','asignacion','docentes','dashboard'].forEach(v=>{
     const el=document.getElementById('view-'+v);
     const tab=document.getElementById('tab-'+v);
     if(el)el.classList.toggle('on',v===id);
@@ -1081,6 +1108,7 @@ function showView(id){
   if(id==='docentes')loadDocentesPanel();
   if(id==='estudiantes')renderStudentManager();
   if(id==='asignacion')renderAssignmentPanel();
+  if(id==='boletas')renderBoletasView();
 }
 
 // ══════════════════════════════════════════
@@ -2270,6 +2298,406 @@ async function saveNotes(){
     const saved = document.getElementById('notes-saved');
     if(saved){ saved.style.display='inline'; setTimeout(()=>saved.style.display='none', 2500); }
   }catch(e){ toast('Error al guardar notas','err'); }
+}
+
+
+// ══════════════════════════════════════════
+//  BOLETAS DE NOTAS
+// ══════════════════════════════════════════
+let boletaMode = 'bimestre';   // 'bimestre' | 'anual'
+let boletaData = {};           // {bimestre: {courseId: {studentIdx: grades}}}
+let boletaBimData = {};        // {bimestre: {studentIdx: bimGrades}}
+let boletaNames = [];
+let boletaProfiles = [];
+let boletaLoadedBim = [];
+
+async function renderBoletasView(){
+  const cont = document.getElementById('boletas-content');
+  cont.innerHTML = `<div class="empty">Cargando datos...</div>`;
+
+  const grado   = document.getElementById('sel-grado').value;
+  const seccion = document.getElementById('sel-seccion').value;
+  const bimestre= document.getElementById('sel-bimestre').value;
+
+  // Build controls UI
+  cont.innerHTML = `
+    <div class="boleta-controls">
+      <h3>📄 Boletas de notas</h3>
+      <div class="ctx-row" style="margin-bottom:12px;">
+        <div class="cf"><label>Grado</label>
+          <select id="bol-grado" onchange="renderBoletasView()">
+            ${['1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta']
+              .map(g=>`<option ${g===grado?'selected':''}>${g}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cf"><label>Sección</label>
+          <select id="bol-seccion" onchange="renderBoletasView()">
+            ${['A','B','C','D','E','Única']
+              .map(s=>`<option ${s===seccion?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cf" id="bol-bim-wrap"><label>Bimestre</label>
+          <select id="bol-bimestre">
+            <option>I</option><option>II</option><option>III</option><option>IV</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Tipo de boleta:</div>
+      <div class="boleta-mode-row">
+        <button class="boleta-mode-btn ${boletaMode==='bimestre'?'active':''}"
+          onclick="setBoletaMode('bimestre')">📋 Por bimestre</button>
+        <button class="boleta-mode-btn ${boletaMode==='anual'?'active':''}"
+          onclick="setBoletaMode('anual')">📅 Consolidado anual (4 bimestres)</button>
+      </div>
+
+      <div class="boleta-btn-row">
+        <button class="btn-boleta btn-boleta-all" onclick="printAllBoletas()">
+          🖨️ Imprimir TODAS las boletas del grado/sección
+        </button>
+      </div>
+    </div>
+
+    <div id="boleta-student-list">
+      <div class="empty">Cargando estudiantes...</div>
+    </div>`;
+
+  // Sync selectors to main context
+  document.getElementById('bol-grado').value   = grado;
+  document.getElementById('bol-seccion').value = seccion;
+  document.getElementById('sel-grado').value   = grado;
+  document.getElementById('sel-seccion').value = seccion;
+
+  // Load all data
+  await loadAllBoletaData();
+  renderStudentCards();
+}
+
+function setBoletaMode(mode){
+  boletaMode = mode;
+  renderBoletasView();
+}
+
+function getBoletaCtx(){
+  const g = document.getElementById('bol-grado')?.value || document.getElementById('sel-grado').value;
+  const s = document.getElementById('bol-seccion')?.value || document.getElementById('sel-seccion').value;
+  const b = document.getElementById('bol-bimestre')?.value || document.getElementById('sel-bimestre').value;
+  return {grado:g, seccion:s, bimestre:b};
+}
+
+async function loadAllBoletaData(){
+  const {grado, seccion} = getBoletaCtx();
+  const bimestres = ['I','II','III','IV'];
+  boletaData = {}; boletaBimData = {};
+
+  // Load names
+  try{
+    const {data:nm} = await db.from('registros').select('estudiante_nombre')
+      .eq('grado',grado).eq('seccion',seccion)
+      .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot').maybeSingle();
+    if(nm){ const p=JSON.parse(nm.estudiante_nombre); boletaNames=p.names||[]; }
+    else boletaNames=[];
+  }catch(e){ boletaNames=[]; }
+
+  // Load profiles
+  try{
+    const profKey=`profiles_${grado}_${seccion}`;
+    const {data:pr}=await db.from('configuracion').select('valor').eq('id',profKey).maybeSingle();
+    boletaProfiles=pr?JSON.parse(pr.valor)||[]:[];
+  }catch(e){ boletaProfiles=[]; }
+
+  // Load grades for all bimestres and all courses
+  for(const bim of bimestres){
+    boletaData[bim] = {};
+    boletaBimData[bim] = {};
+    // Bimestral shared
+    try{
+      const {data:bm}=await db.from('registros').select('estudiante_nombre')
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+        .eq('curso_id','_bimestral').eq('columna_key','snapshot').maybeSingle();
+      boletaBimData[bim]=bm?JSON.parse(bm.estudiante_nombre)||{}:{};
+    }catch(e){}
+    // Each course
+    for(const course of COURSES){
+      try{
+        const {data:gr}=await db.from('registros').select('estudiante_nombre')
+          .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+          .eq('curso_id',course.id).eq('columna_key','snapshot').maybeSingle();
+        boletaData[bim][course.id]=gr?JSON.parse(gr.estudiante_nombre)||{}:{};
+      }catch(e){ boletaData[bim][course.id]={}; }
+    }
+  }
+}
+
+// Calc weighted avg from boleta data
+function calcBoletaAvg(studentIdx, bim, courseId){
+  const g = boletaData[bim]?.[courseId] || {};
+  const bd= boletaBimData[bim] || {};
+  const si = studentIdx;
+  let g1sum=0,g1cnt=0;
+  COLS_SEM.filter(c=>!c.qual).forEach(c=>{
+    const v=parseFloat((g[si]||{})[c.key]);
+    if(!isNaN(v)&&(g[si]||{})[c.key]!==''){g1sum+=v;g1cnt++;}
+  });
+  COLS_EXP.forEach(c=>{
+    const v=parseFloat((g[si]||{})[c.key]);
+    if(!isNaN(v)&&(g[si]||{})[c.key]!==''){g1sum+=v;g1cnt++;}
+  });
+  COLS_QUAL.forEach(c=>{
+    const q=(g[si]||{})[c.key]||'';
+    const n=qualToNum(q); if(n!==null){g1sum+=n;g1cnt++;}
+  });
+  const g1avg=g1cnt>0?g1sum/g1cnt:null;
+  const bimVals=[];
+  COLS_BIM.forEach(c=>{
+    const v=parseFloat((bd[si]||{})[c.key]);
+    if(!isNaN(v)&&(bd[si]||{})[c.key]!=='') bimVals.push(v);
+  });
+  const cpv=parseFloat((g[si]||{}).cp);
+  const cpNum=(!isNaN(cpv)&&(g[si]||{}).cp!=='')?cpv:null;
+  if(g1avg===null&&!bimVals.length&&cpNum===null) return null;
+  let tw=0,tv=0;
+  if(g1avg!==null){tv+=g1avg*65;tw+=65;}
+  bimVals.forEach(v=>{tv+=v*10;tw+=10;});
+  if(cpNum!==null){tv+=cpNum*5;tw+=5;}
+  return tw?Math.round((tv/tw)*10)/10:null;
+}
+
+function renderStudentCards(){
+  const list = document.getElementById('boleta-student-list');
+  if(!list) return;
+  const {bimestre} = getBoletaCtx();
+  const bims = boletaMode==='anual'?['I','II','III','IV']:[bimestre];
+
+  if(!boletaNames.length){ list.innerHTML='<div class="empty">No hay estudiantes registrados en este grado/sección.</div>'; return; }
+
+  list.innerHTML = `
+    <div style="font-size:13px;font-weight:800;margin-bottom:10px;color:var(--text2);">
+      ${boletaNames.filter(n=>n).length} estudiantes · Clic en una tarjeta para ver e imprimir la boleta individual
+    </div>
+    <div class="boleta-preview-list">
+      ${boletaNames.map((name,i)=>{
+        if(!name) return '';
+        // Get scores for display
+        const scores = bims.map(bim=>{
+          const avgs=COURSES.map(c=>calcBoletaAvg(i,bim,c.id)).filter(a=>a!==null);
+          const prom=avgs.length?Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10:null;
+          return{bim,prom};
+        });
+        const scoreChips=scores.map(({bim,prom})=>{
+          const l=prom!==null?toLetter(prom):'';
+          const bg=l==='AD'?'var(--ad-bg)':l==='A'?'var(--a-bg)':l==='B'?'var(--b-bg)':l==='C'?'var(--c-bg)':'var(--surf2)';
+          const tx=l==='AD'?'var(--ad)':l==='A'?'var(--a)':l==='B'?'var(--b)':l==='C'?'var(--c)':'var(--text3)';
+          return`<span class="bpc-score" style="background:${bg};color:${tx};">Bim.${bim}: ${prom!==null?prom+' '+l:'—'}</span>`;
+        }).join('');
+        const prof=boletaProfiles[i]||{};
+        return`<div class="boleta-preview-card" onclick="printOneBoleta(${i})">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:38px;height:38px;border-radius:50%;overflow:hidden;background:var(--accent-l);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              ${prof.photoB64?`<img src="${prof.photoB64}" style="width:100%;height:100%;object-fit:cover;">`
+                :`<span style="font-size:16px;">👤</span>`}
+            </div>
+            <div>
+              <div class="bpc-name">${name}</div>
+              <div class="bpc-info">${prof.dni?'DNI: '+prof.dni+' · ':''} ${boletaMode==='anual'?'Consolidado anual':'Bim. '+bimestre}</div>
+            </div>
+          </div>
+          <div class="bpc-scores">${scoreChips}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ── BUILD BOLETA HTML ──
+function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
+  const name = boletaNames[studentIdx]||`Estudiante ${studentIdx+1}`;
+  const prof  = boletaProfiles[studentIdx]||{};
+  const isAnual = bimestres.length>1;
+  const logoHtml = logoSrc&&logoSrc.startsWith('data:')
+    ?`<img src="${logoSrc}" style="width:70px;height:70px;object-fit:contain;border-radius:8px;">`
+    :`<div style="width:70px;height:70px;background:#E3EBF8;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#2B5EA7;">LNE</div>`;
+  const photoHtml = prof.photoB64
+    ?`<img src="${prof.photoB64}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid #DDD8D0;">`
+    :`<div style="width:80px;height:80px;border-radius:8px;background:#EDE9E2;display:flex;align-items:center;justify-content:center;font-size:32px;">👤</div>`;
+
+  const colColor={AD:'#D4F2E6',A:'#D6E8FB',B:'#FEF3CE',C:'#FBE0E0'};
+  const txtColor={AD:'#0E6E45',A:'#1558A0',B:'#7A5C0A',C:'#9B1B1B'};
+
+  // Course rows
+  const courseRows = COURSES.map(c=>{
+    const cells = bimestres.map(bim=>{
+      const avg=calcBoletaAvg(studentIdx,bim,c.id);
+      const l=avg!==null?toLetter(avg):'';
+      const bg=l?colColor[l]:'#F9F7F4';
+      const tx=l?txtColor[l]:'#A09890';
+      return`<td style="text-align:center;padding:5px 6px;background:${bg};">
+        <span style="font-weight:800;color:${tx};font-family:'JetBrains Mono',monospace;font-size:12px;">${avg!==null?avg:'—'}</span>
+        ${l?`<br><span style="font-size:9px;font-weight:700;color:${tx};">${l}</span>`:''}
+      </td>`;
+    }).join('');
+
+    // Promedio si es anual
+    let promCell='';
+    if(isAnual){
+      const avgs=bimestres.map(bim=>calcBoletaAvg(studentIdx,bim,c.id)).filter(a=>a!==null);
+      const prom=avgs.length?Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10:null;
+      const l=prom!==null?toLetter(prom):'';
+      const bg=l?colColor[l]:'#F9F7F4'; const tx=l?txtColor[l]:'#A09890';
+      promCell=`<td style="text-align:center;padding:5px 6px;background:${bg};border-left:2px solid #DDD8D0;">
+        <span style="font-weight:800;color:${tx};font-family:'JetBrains Mono',monospace;font-size:13px;">${prom!==null?prom:'—'}</span>
+        ${l?`<br><span style="font-size:9px;font-weight:700;color:${tx};">${l}</span>`:''}
+      </td>`;
+    }
+    return`<tr style="border-bottom:1px solid #EDE9E2;">
+      <td style="padding:5px 8px;font-size:11px;display:flex;align-items:center;gap:5px;">
+        <span style="font-size:13px;">${c.icon||'📚'}</span>${c.label}
+      </td>
+      ${cells}${promCell}
+    </tr>`;
+  }).join('');
+
+  // Promedio general del alumno por bimestre
+  const promsRow = bimestres.map(bim=>{
+    const avgs=COURSES.map(c=>calcBoletaAvg(studentIdx,bim,c.id)).filter(a=>a!==null);
+    const prom=avgs.length?Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length*10)/10:null;
+    const l=prom!==null?toLetter(prom):'';
+    const bg=l?colColor[l]:'#F9F7F4'; const tx=l?txtColor[l]:'#A09890';
+    return`<td style="text-align:center;padding:6px;background:${bg};border-top:2px solid #DDD8D0;">
+      <div style="font-weight:800;color:${tx};font-family:'JetBrains Mono',monospace;font-size:14px;">${prom!==null?prom:'—'}</div>
+      ${l?`<div style="font-size:10px;font-weight:800;color:${tx};">${l}</div>`:''}
+    </td>`;
+  }).join('');
+
+  let promAnualCell='';
+  if(isAnual){
+    const allAvgs=bimestres.flatMap(bim=>COURSES.map(c=>calcBoletaAvg(studentIdx,bim,c.id))).filter(a=>a!==null);
+    const promA=allAvgs.length?Math.round(allAvgs.reduce((a,b)=>a+b,0)/allAvgs.length*10)/10:null;
+    const l=promA!==null?toLetter(promA):'';
+    const bg=l?colColor[l]:'#F9F7F4'; const tx=l?txtColor[l]:'#A09890';
+    promAnualCell=`<td style="text-align:center;padding:6px;background:${bg};border-top:2px solid #DDD8D0;border-left:2px solid #DDD8D0;">
+      <div style="font-weight:800;color:${tx};font-family:'JetBrains Mono',monospace;font-size:15px;">${promA!==null?promA:'—'}</div>
+      ${l?`<div style="font-size:10px;font-weight:800;color:${tx};">${l}</div>`:''}
+    </td>`;
+  }
+
+  const bimHeaders = bimestres.map(b=>`<th style="text-align:center;padding:6px;background:#2B5EA7;color:white;font-size:10px;min-width:64px;">Bim. ${b}</th>`).join('');
+  const promAnualHdr = isAnual?`<th style="text-align:center;padding:6px;background:#1A3E7A;color:white;font-size:10px;border-left:2px solid #DDD8D0;min-width:72px;">Promedio<br>Anual</th>`:'';
+
+  const scaleRow=['AD','A','B','C'].map(l=>`
+    <span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;">
+      <span style="background:${colColor[l]};color:${txtColor[l]};font-weight:800;font-size:10px;padding:2px 7px;border-radius:4px;">${l}</span>
+      <span style="font-size:10px;color:#6B6258;">${l==='AD'?'18–20 Logro Destacado':l==='A'?'14–17 Logro Esperado':l==='B'?'11–13 En Proceso':'00–10 En Inicio'}</span>
+    </span>`).join('');
+
+  return `
+    <div style="width:794px;min-height:1100px;padding:28px 28px 20px;background:white;font-family:'Plus Jakarta Sans',sans-serif;page-break-after:always;box-sizing:border-box;">
+      <!-- HEADER -->
+      <div style="display:flex;align-items:center;gap:14px;padding-bottom:14px;border-bottom:3px solid #2B5EA7;margin-bottom:14px;">
+        ${logoHtml}
+        <div style="flex:1;">
+          <div style="font-size:18px;font-weight:800;color:#17150F;">I.E. Nueva Esperanza</div>
+          <div style="font-size:12px;color:#6B6258;margin-top:2px;">Boleta de Información — ${isAnual?'Consolidado Anual 2026':'Bimestre '+bimestres[0]+' 2026'}</div>
+          <div style="font-size:11px;color:#A09890;margin-top:1px;">${grado} Grado · Sección ${seccion} · CNB 2026</div>
+        </div>
+        ${photoHtml}
+      </div>
+
+      <!-- STUDENT INFO -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
+        <div style="background:#F4F1EC;border-radius:7px;padding:8px 10px;">
+          <div style="font-size:9px;font-weight:700;color:#A09890;text-transform:uppercase;letter-spacing:.4px;">Apellidos y Nombres</div>
+          <div style="font-size:12px;font-weight:800;color:#17150F;margin-top:3px;">${name}</div>
+        </div>
+        <div style="background:#F4F1EC;border-radius:7px;padding:8px 10px;">
+          <div style="font-size:9px;font-weight:700;color:#A09890;text-transform:uppercase;letter-spacing:.4px;">DNI</div>
+          <div style="font-size:12px;font-weight:800;color:#17150F;margin-top:3px;">${prof.dni||'—'}</div>
+        </div>
+        <div style="background:#F4F1EC;border-radius:7px;padding:8px 10px;">
+          <div style="font-size:9px;font-weight:700;color:#A09890;text-transform:uppercase;letter-spacing:.4px;">Apoderado</div>
+          <div style="font-size:12px;font-weight:800;color:#17150F;margin-top:3px;">${prof.guardian||'—'}</div>
+        </div>
+        <div style="background:#F4F1EC;border-radius:7px;padding:8px 10px;">
+          <div style="font-size:9px;font-weight:700;color:#A09890;text-transform:uppercase;letter-spacing:.4px;">Teléfono</div>
+          <div style="font-size:12px;font-weight:800;color:#17150F;margin-top:3px;">${prof.phone||'—'}</div>
+        </div>
+      </div>
+
+      <!-- GRADES TABLE -->
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:14px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;background:#2B5EA7;color:white;font-size:10px;border-radius:4px 0 0 0;">Área / Curso</th>
+            ${bimHeaders}${promAnualHdr}
+          </tr>
+        </thead>
+        <tbody>${courseRows}</tbody>
+        <tfoot>
+          <tr>
+            <td style="padding:6px 8px;font-weight:800;font-size:11px;border-top:2px solid #DDD8D0;">PROMEDIO GENERAL</td>
+            ${promsRow}${promAnualCell}
+          </tr>
+        </tfoot>
+      </table>
+
+
+
+
+
+      <!-- FOOTER SIGNATURES -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:16px;">
+        <div style="text-align:center;">
+          <div style="width:150px;height:1px;background:#DDD8D0;margin-bottom:5px;"></div>
+          <div style="font-size:10px;color:#6B6258;">Firma del Director</div>
+        </div>
+        <div style="text-align:center;font-size:10px;color:#A09890;">
+          I.E. Nueva Esperanza · ${grado} Grado Sección ${seccion} · 2026
+        </div>
+        <div style="text-align:center;">
+          <div style="width:150px;height:1px;background:#DDD8D0;margin-bottom:5px;"></div>
+          <div style="font-size:10px;color:#6B6258;">Firma del Apoderado</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function printOneBoleta(studentIdx){
+  const {grado,seccion,bimestre}=getBoletaCtx();
+  const bims=boletaMode==='anual'?['I','II','III','IV']:[bimestre];
+  const logoSrc=document.getElementById('tb-logo-img')?.src||'';
+  const html=buildBoletaHTML(studentIdx,bims,logoSrc,grado,seccion);
+  openPrintWindow([html]);
+}
+
+async function printAllBoletas(){
+  const {grado,seccion,bimestre}=getBoletaCtx();
+  const bims=boletaMode==='anual'?['I','II','III','IV']:[bimestre];
+  const logoSrc=document.getElementById('tb-logo-img')?.src||'';
+  toast('Preparando todas las boletas...','ok');
+  const pages=boletaNames
+    .map((name,i)=>name?buildBoletaHTML(i,bims,logoSrc,grado,seccion):null)
+    .filter(Boolean);
+  if(!pages.length){toast('No hay estudiantes registrados','warn');return;}
+  openPrintWindow(pages);
+}
+
+function openPrintWindow(pages){
+  const w=window.open('','_blank','width=900,height=700');
+  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{background:#DDD;font-family:'Plus Jakarta Sans',sans-serif;}
+      @media print{
+        body{background:white;}
+        .page-wrap{box-shadow:none;margin:0;}
+      }
+      .page-wrap{background:white;width:794px;margin:20px auto;box-shadow:0 4px 30px rgba(0,0,0,.2);}
+    </style>
+    </head><body>
+    ${pages.map(p=>`<div class="page-wrap">${p}</div>`).join('')}
+    <script>window.onload=()=>setTimeout(()=>{window.print();},700);<\/script>
+    </body></html>`);
+  w.document.close();
 }
 
 // ══════════════════════════════════════════
