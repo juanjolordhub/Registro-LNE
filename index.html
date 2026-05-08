@@ -1691,7 +1691,7 @@ function renderStats(){
       </div>
       <div class="col-stats-grid">${qualCards}</div>
     </div>
-  </div>`;
+  </div></div>`;
 }
 
 // ══════════════════════════════════════════
@@ -2581,11 +2581,25 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
   // Use uploaded school shield as primary logo
   const shieldSrc = (typeof SCHOOL_SHIELD_B64 !== 'undefined') ? SCHOOL_SHIELD_B64 : '';
   const instLogoHtml = shieldSrc
-    ?`<img src="${shieldSrc}" style="width:90px;height:90px;object-fit:contain;">`
-    :`<div style="width:90px;height:90px;background:${LBLU};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${BLU};text-align:center;">LNE</div>`;
+    ?`<img src="${shieldSrc}" style="width:100px;height:100px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(26,78,154,.3));">`
+    :`<div style="width:100px;height:100px;background:${LBLU};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:${BLU};text-align:center;">LNE</div>`;
 
   // Courses to display (only active visible ones)
-  const displayCourses = COURSES.filter(c=>visibleCourseIds.includes(c.id));
+  // Only show courses that have at least one note in any bimestre
+  const displayCourses = COURSES.filter(c=>{
+    if(!visibleCourseIds.includes(c.id)) return false;
+    return ['I','II','III','IV'].some(bim=>{
+      // Check numeric cols
+      const g=boletaData[bim]?.[c.id]||{};
+      return Object.values(g).some(row=>{
+        if(!row||typeof row!=='object') return false;
+        return COLS_NUM.some(col=>{
+          const v=(row||{})[col.key];
+          return v!==''&&v!==undefined&&v!==null;
+        });
+      });
+    });
+  });
 
   // Build rows: one per bimestre + PF + Nivel
   const BIMS_DISPLAY = isAnual ? ['I','II','III','IV'] : bimestres;
@@ -2667,7 +2681,10 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
   const pfNBg=pfNivel?cc[pfNivel]:LBLU; const pfNTx=pfNivel?ct[pfNivel]:'#A09890';
 
   return `
-  <div style="width:277mm;min-height:190mm;padding:10mm 10mm 8mm;background:white;font-family:'Plus Jakarta Sans',sans-serif;page-break-after:always;box-sizing:border-box;position:relative;overflow:hidden;">
+  <div style="width:277mm;min-height:190mm;padding:0;background:white;font-family:'Plus Jakarta Sans',sans-serif;page-break-after:always;box-sizing:border-box;position:relative;overflow:hidden;">
+    <!-- TOP STRIPE -->
+    <div style="height:6px;background:linear-gradient(90deg,#1A4E9A,#4A7EC7,#1A4E9A);width:100%;"></div>
+    <div style="padding:8mm 10mm 8mm;">
 
     <!-- WAVE BG decoration -->
     <div style="position:absolute;bottom:0;left:0;right:0;height:35mm;overflow:hidden;z-index:0;">
@@ -2679,27 +2696,28 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
 
     <div style="position:relative;z-index:1;">
     <!-- HEADER -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6mm;">
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:800;color:${BLU};text-align:center;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">Institución Educativa Particular</div>
-        <div style="font-size:28px;color:${BLU};text-align:center;font-style:italic;font-weight:800;letter-spacing:1px;font-family:Georgia,serif;">"La Nueva Esperanza"</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5mm;padding:6px 12px 8px;background:linear-gradient(135deg,${BLU} 60%,${MBLUE} 100%);border-radius:10px;box-shadow:0 3px 12px rgba(26,78,154,.35);">
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">Institución Educativa Particular</div>
+        <div style="font-size:26px;color:#FFFFFF;font-style:italic;font-weight:800;letter-spacing:1px;font-family:Georgia,serif;text-shadow:0 2px 8px rgba(0,0,0,.25);">"La Nueva Esperanza"</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:3px;letter-spacing:1.5px;">BOLETA DE INFORMACIÓN — LA OROYA</div>
       </div>
-      <div style="flex-shrink:0;margin-left:10px;">${instLogoHtml}</div>
+      <div style="flex-shrink:0;margin-left:14px;background:white;border-radius:50%;padding:4px;box-shadow:0 2px 10px rgba(0,0,0,.3);">${instLogoHtml}</div>
     </div>
 
     <!-- STUDENT INFO -->
-    <div style="display:flex;gap:8px;margin-bottom:5mm;align-items:center;">
-      <div style="display:flex;align-items:center;gap:6px;flex:1;">
-        <span style="font-size:11px;font-weight:800;color:${BLU};white-space:nowrap;">ALUMNO (A):</span>
-        <div style="flex:1;border-bottom:1.5px solid ${BLU};padding-bottom:2px;font-size:12px;font-weight:700;color:#17150F;">${name}</div>
+    <div style="display:flex;gap:8px;margin-bottom:4mm;align-items:stretch;background:${LBLU};border-radius:8px;padding:8px 12px;border-left:4px solid ${BLU};">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;">
+        <span style="font-size:10px;font-weight:800;color:${BLU};white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Alumno(a):</span>
+        <div style="flex:1;font-size:13px;font-weight:800;color:#17150F;border-bottom:1.5px solid ${BLU};padding-bottom:1px;">${name}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;min-width:120px;">
-        <span style="font-size:11px;font-weight:800;color:${BLU};white-space:nowrap;">NIVEL:</span>
-        <div style="flex:1;border-bottom:1.5px solid ${BLU};padding-bottom:2px;font-size:12px;font-weight:700;color:#17150F;">${grado}</div>
+      <div style="display:flex;align-items:center;gap:6px;min-width:115px;border-left:1px solid #C5D8EE;padding-left:10px;">
+        <span style="font-size:10px;font-weight:800;color:${BLU};white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Nivel:</span>
+        <div style="font-size:12px;font-weight:800;color:#17150F;">${grado}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;min-width:100px;">
-        <span style="font-size:11px;font-weight:800;color:${BLU};white-space:nowrap;">SECCIÓN:</span>
-        <div style="flex:1;border-bottom:1.5px solid ${BLU};padding-bottom:2px;font-size:12px;font-weight:700;color:#17150F;">${seccion}</div>
+      <div style="display:flex;align-items:center;gap:6px;min-width:110px;border-left:1px solid #C5D8EE;padding-left:10px;">
+        <span style="font-size:10px;font-weight:800;color:${BLU};white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Sección:</span>
+        <div style="font-size:12px;font-weight:800;color:#17150F;">${seccion}</div>
       </div>
     </div>
 
@@ -2740,18 +2758,14 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
 
     <!-- FOOTER -->
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:8mm;position:relative;z-index:2;">
-      <div style="min-width:140px;">
-        <div style="border:1.5px solid ${BLU};border-radius:6px;padding:8px 10px;min-height:40px;">
-          <div style="font-size:9px;font-weight:800;color:${BLU};text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">LEYENDA</div>
-          <div style="font-size:9px;color:#6B6258;">${prof.guardian?'Apod: '+prof.guardian:''}</div>
-          <div style="font-size:9px;color:#6B6258;">${prof.phone?'Tel: '+prof.phone:''}</div>
-          <div style="font-size:9px;color:#6B6258;">${prof.dni?'DNI: '+prof.dni:''}</div>
-        </div>
-      </div>
+      <div style="flex:1;"></div>
       <div style="text-align:center;">
-        <div style="width:160px;border-top:1.5px solid #17150F;padding-top:4px;margin:0 auto;">
-          <div style="font-size:10px;font-weight:800;color:#17150F;">HURTADO HUANCAYA</div>
-          <div style="font-size:10px;color:#6B6258;">DIRECTOR</div>
+        <div style="width:200px;margin:0 auto;">
+          <div style="height:28px;"></div>
+          <div style="border-top:1.5px solid #17150F;padding-top:5px;">
+            <div style="font-size:10px;font-weight:800;color:#17150F;letter-spacing:.3px;">RICARDO HURTADO HUANCAYA</div>
+            <div style="font-size:9px;color:#6B6258;margin-top:2px;font-weight:700;">DIRECTOR</div>
+          </div>
         </div>
       </div>
     </div>
