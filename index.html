@@ -2,6 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+  <meta name="theme-color" content="#1A4E9A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LNE Registro">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" id="pwa-manifest">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>I.E. Nueva Esperanza — Registro Académico CNB 2026</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -377,6 +383,7 @@ tr:hover td{background:var(--surf3);}
   .ctx-row{gap:8px;}
 }
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -1884,37 +1891,63 @@ async function loadDashboard(){
 
     dashData={courseAgg,totals,totalEv};
 
+    // Build course data for charts (only courses with data)
+    const activeCourses = COURSES.filter(c=>courseAgg[c.id]?.n>0);
+
     document.getElementById('dash-content').innerHTML=`
-      <div class="kpi-grid">
-        <div class="kpi"><div class="kl">Registros evaluados</div><div class="kv">${totalEv}</div><div class="ks">Total en todos los cursos</div></div>
-        <div class="kpi kAD"><div class="kl">Logro Destacado</div><div class="kv">${totals.AD}</div><div class="ks">${totalEv?Math.round(totals.AD/totalEv*100):0}% del total</div></div>
-        <div class="kpi kA"><div class="kl">Logro Esperado</div><div class="kv">${totals.A}</div><div class="ks">${totalEv?Math.round(totals.A/totalEv*100):0}% del total</div></div>
-        <div class="kpi kBC"><div class="kl">En Proceso + Inicio</div><div class="kv">${totals.B+totals.C}</div><div class="ks">Requieren refuerzo</div></div>
+      <!-- KPI CARDS -->
+      <div class="kpi-grid" style="margin-bottom:16px;">
+        <div class="kpi"><div class="kl">Total evaluados</div><div class="kv">${totalEv}</div><div class="ks">registros con nota</div></div>
+        <div class="kpi kAD"><div class="kl">Logro Destacado AD</div><div class="kv">${totals.AD}</div><div class="ks">${totalEv?Math.round(totals.AD/totalEv*100):0}%</div></div>
+        <div class="kpi kA"><div class="kl">Logro Esperado A</div><div class="kv">${totals.A}</div><div class="ks">${totalEv?Math.round(totals.A/totalEv*100):0}%</div></div>
+        <div class="kpi kBC"><div class="kl">En Proceso/Inicio B+C</div><div class="kv">${totals.B+totals.C}</div><div class="ks">requieren refuerzo</div></div>
       </div>
-      <div class="card" style="margin-bottom:14px;padding:12px 16px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">DOCENTES EN EL SISTEMA</div>
+
+      <!-- CHARTS ROW -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <!-- Donut chart: overall distribution -->
+        <div class="card" style="padding:16px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text2);margin-bottom:12px;">📊 Distribución General de Logros</div>
+          <div style="position:relative;height:220px;"><canvas id="donut-chart"></canvas></div>
+        </div>
+        <!-- Bar chart: by course -->
+        <div class="card" style="padding:16px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text2);margin-bottom:12px;">📈 Promedio por Curso</div>
+          <div style="position:relative;height:220px;overflow:hidden;"><canvas id="bar-chart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Full bar chart: AD/A/B/C stacked by course -->
+      <div class="card" style="padding:16px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:800;color:var(--text2);margin-bottom:12px;">📊 Distribución de Logros por Curso</div>
+        <div style="position:relative;height:${Math.max(200,activeCourses.length*28)}px;"><canvas id="stacked-chart"></canvas></div>
+      </div>
+
+      <!-- Docentes -->
+      <div class="card" style="padding:12px 16px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">👥 Docentes en el sistema</div>
         <div style="font-size:13px;">${docentesList}</div>
       </div>
+
+      <!-- Detail table -->
       <div class="card">
-        <div style="display:flex;gap:10px;margin-bottom:12px;font-size:11px;flex-wrap:wrap;">
-          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--ad);display:inline-block;"></span>AD</span>
-          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--a);display:inline-block;"></span>A</span>
-          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#E0B840;display:inline-block;"></span>B</span>
-          <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--c-br);display:inline-block;"></span>C</span>
-        </div>
+        <div style="font-size:12px;font-weight:800;color:var(--text2);margin-bottom:10px;">📋 Detalle por curso</div>
         <div style="overflow:auto;">
           <table class="dash-tbl">
             <thead><tr>
-              <th>Curso</th><th style="text-align:center;">Promedio</th>
-              <th style="text-align:center;">Evaluados</th>
+              <th>Curso</th><th style="text-align:center;">Prom.</th>
+              <th style="text-align:center;">Eval.</th>
               <th>Distribución</th>
-              <th style="text-align:center;">%AD · %A · %B · %C</th>
+              <th style="text-align:center;">AD·A·B·C</th>
               <th>Docente(s)</th>
             </tr></thead>
             <tbody>${courseRows}</tbody>
           </table>
         </div>
       </div>`;
+
+    // ── Render charts after DOM update ──
+    setTimeout(()=>renderDashCharts(activeCourses, courseAgg, totals, totalEv), 100);
     setSyncState('ok','dashboard actualizado');
   }catch(e){
     setSyncState('error','error');
@@ -3280,6 +3313,176 @@ function exportStudentListPDF(){
     <script>window.onload=()=>setTimeout(()=>{window.print();},600);<\/script>
     </body></html>`);
   w.document.close();
+}
+
+
+// ══════════════════════════════════════════
+//  PWA — INSTALACIÓN COMO APP
+// ══════════════════════════════════════════
+let deferredPrompt = null;
+
+function initPWA(){
+  // Build manifest dynamically using embedded shield icon
+  const iconB64 = (typeof SCHOOL_SHIELD_B64 !== 'undefined') ? SCHOOL_SHIELD_B64 : '';
+  const manifest = {
+    name: 'I.E. La Nueva Esperanza — Registro',
+    short_name: 'LNE Registro',
+    description: 'Registro Académico Colaborativo — La Oroya',
+    start_url: '/Registro-LNE/',
+    scope: '/Registro-LNE/',
+    display: 'standalone',
+    background_color: '#1A4E9A',
+    theme_color: '#1A4E9A',
+    orientation: 'landscape',
+    icons: iconB64 ? [
+      { src: iconB64, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: iconB64, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+    ] : []
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+  const url  = URL.createObjectURL(blob);
+  document.getElementById('pwa-manifest').href = url;
+
+  // Service Worker via Blob
+  if('serviceWorker' in navigator){
+    const swCode = `
+const CACHE = 'lne-v1';
+const ASSETS = ['/Registro-LNE/'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(() => clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  if(e.request.method !== 'GET') return;
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+});`;
+    const swBlob = new Blob([swCode], {type:'application/javascript'});
+    const swUrl  = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl).catch(()=>{});
+  }
+
+  // Install button
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const btn = document.getElementById('pwa-install-btn');
+    if(btn) btn.style.display = 'flex';
+  });
+  window.addEventListener('appinstalled', () => {
+    const btn = document.getElementById('pwa-install-btn');
+    if(btn) btn.style.display = 'none';
+    toast('✓ App instalada correctamente', 'ok');
+  });
+}
+
+async function installPWA(){
+  if(!deferredPrompt){ toast('Usa el menú del navegador → "Instalar app"', 'ok'); return; }
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if(btn) btn.style.display = 'none';
+}
+
+
+// ══════════════════════════════════════════
+//  DASHBOARD CHARTS (Chart.js)
+// ══════════════════════════════════════════
+let _charts = {};
+
+function destroyChart(id){
+  if(_charts[id]){ _charts[id].destroy(); delete _charts[id]; }
+}
+
+function renderDashCharts(activeCourses, courseAgg, totals, totalEv){
+  const AD_C='#22C55E', A_C='#3B82F6', B_C='#F59E0B', C_C='#EF4444';
+
+  // ── 1. Donut chart ──
+  destroyChart('donut');
+  const dc = document.getElementById('donut-chart');
+  if(dc && totalEv>0){
+    _charts['donut'] = new Chart(dc, {
+      type:'doughnut',
+      data:{
+        labels:['AD - Logro Destacado','A - Logro Esperado','B - En Proceso','C - En Inicio'],
+        datasets:[{
+          data:[totals.AD,totals.A,totals.B,totals.C],
+          backgroundColor:[AD_C,A_C,B_C,C_C],
+          borderWidth:2, borderColor:'#fff', hoverOffset:8
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        cutout:'65%',
+        plugins:{
+          legend:{position:'right',labels:{font:{size:11,family:'Plus Jakarta Sans'},padding:10}},
+          tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} (${totalEv?Math.round(ctx.raw/totalEv*100):0}%)`}}
+        }
+      }
+    });
+  }
+
+  // ── 2. Bar chart: promedio por curso ──
+  destroyChart('bar');
+  const bc = document.getElementById('bar-chart');
+  if(bc && activeCourses.length>0){
+    const labels = activeCourses.map(c=>c.short);
+    const proms  = activeCourses.map(c=>parseFloat((courseAgg[c.id].sum/courseAgg[c.id].n).toFixed(1)));
+    const colors = proms.map(p=>p>=18?AD_C:p>=14?A_C:p>=11?B_C:C_C);
+    _charts['bar'] = new Chart(bc, {
+      type:'bar',
+      data:{
+        labels,
+        datasets:[{
+          label:'Promedio',
+          data:proms,
+          backgroundColor:colors,
+          borderRadius:5, borderSkipped:false,
+          maxBarThickness:32
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{
+          y:{min:0,max:20,ticks:{stepSize:5,font:{size:10}},grid:{color:'rgba(0,0,0,.06)'}},
+          x:{ticks:{font:{size:10,weight:'bold'}},grid:{display:false}}
+        },
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>`Promedio: ${ctx.raw}`}}
+        }
+      }
+    });
+  }
+
+  // ── 3. Stacked horizontal bar: AD/A/B/C por curso ──
+  destroyChart('stacked');
+  const sc = document.getElementById('stacked-chart');
+  if(sc && activeCourses.length>0){
+    const labels = activeCourses.map(c=>c.label);
+    const mk=(g,clr)=>({
+      label:g, backgroundColor:clr, borderWidth:0,
+      data:activeCourses.map(c=>courseAgg[c.id][g]||0)
+    });
+    _charts['stacked'] = new Chart(sc, {
+      type:'bar',
+      data:{ labels, datasets:[mk('AD',AD_C),mk('A',A_C),mk('B',B_C),mk('C',C_C)] },
+      options:{
+        indexAxis:'y',
+        responsive:true, maintainAspectRatio:false,
+        scales:{
+          x:{stacked:true,ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,.06)'}},
+          y:{stacked:true,ticks:{font:{size:10,weight:'bold'}},grid:{display:false}}
+        },
+        plugins:{
+          legend:{position:'top',labels:{font:{size:11,family:'Plus Jakarta Sans'},padding:10}},
+          tooltip:{mode:'index',intersect:false}
+        }
+      }
+    });
+  }
 }
 
 // ══════════════════════════════════════════
