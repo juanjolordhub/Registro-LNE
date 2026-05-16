@@ -330,6 +330,13 @@ tr:hover td{background:var(--surf3);}
 .bpc-scores{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .bpc-score{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;}
 
+
+/* EDITABLE HEADERS */
+.th-edit{background:transparent;border:none;font-size:9px;font-weight:800;color:inherit;font-family:'Plus Jakarta Sans',sans-serif;text-align:center;width:100%;cursor:text;padding:0;outline:none;}
+.th-edit:hover{background:rgba(255,255,255,.15);border-radius:3px;}
+.th-edit:focus{background:rgba(255,255,255,.25);border-radius:3px;}
+.th-grp-title{font-size:9px;font-weight:800;}
+
 /* NOTES BOX */
 .notes-box{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);margin-top:14px;}
 .notes-box-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
@@ -856,9 +863,23 @@ function wAvg(i, bimData){
   const libArr=[]; COLS_QUAL.forEach(c=>{const n=qualToNum(g[c.key]||'');if(n!==null)libArr.push(n);});
   const libAvg=libArr.length?libArr.reduce((a,b)=>a+b,0)/libArr.length:null;
 
-  // ── Evaluaciones Bimestrales = 10% c/u ──
-  const bimArr=[];
-  if(bimData){ COLS_BIM.forEach(c=>{const v=parseFloat((bimData[i]||{})[c.key]);if(!isNaN(v)&&(bimData[i]||{})[c.key]!=='')bimArr.push(v);}); }
+  // ── Evaluaciones Bimestrales: (EB1+EB2)/2 promediado con EB3 = 30% total ──
+  // Formula: promEB12 = (EB1+EB2)/2, luego bimFinal = (promEB12+EB3)/2
+  // Si solo hay EB1 y EB2: promEB12. Si solo EB3: EB3. Si los 3: (promEB12+EB3)/2
+  let bimFinalVal=null;
+  if(bimData){
+    const eb1=parseFloat((bimData[i]||{}).eb1); const hasEB1=!isNaN(eb1)&&(bimData[i]||{}).eb1!=='';
+    const eb2=parseFloat((bimData[i]||{}).eb2); const hasEB2=!isNaN(eb2)&&(bimData[i]||{}).eb2!=='';
+    const eb3=parseFloat((bimData[i]||{}).eb3); const hasEB3=!isNaN(eb3)&&(bimData[i]||{}).eb3!=='';
+    let promEB12=null;
+    if(hasEB1&&hasEB2) promEB12=(eb1+eb2)/2;
+    else if(hasEB1) promEB12=eb1;
+    else if(hasEB2) promEB12=eb2;
+    if(promEB12!==null&&hasEB3) bimFinalVal=(promEB12+eb3)/2;
+    else if(promEB12!==null) bimFinalVal=promEB12;
+    else if(hasEB3) bimFinalVal=eb3;
+  }
+  const bimArr=bimFinalVal!==null?[bimFinalVal]:[];
 
   // ── Comportamiento = 5% ──
   const cpv=parseFloat(g.cp);
@@ -1319,6 +1340,7 @@ async function loadGrades(){
     toast('Error al cargar: '+e.message,'err');
     // Still render with whatever data we have
   }
+  await loadHdrLabels();
   renderTable();
   renderStats();
   loadNotes();
@@ -1423,7 +1445,7 @@ function renderTable(){
   const gRow=`
     <th rowspan="3" style="width:26px;text-align:center;background:var(--surf2);font-size:9px;font-weight:700;color:var(--text2);padding:5px 3px;border-bottom:2px solid var(--border);">#</th>
     <th rowspan="3" style="min-width:155px;text-align:left;background:var(--surf2);font-size:9px;font-weight:700;color:var(--text2);padding:5px 7px;border-bottom:2px solid var(--border);">APELLIDOS Y NOMBRES</th>
-    <th class="th-g gs" colspan="18" style="border-right:2px solid var(--border2);">Notas Semanales + Avance del Libro</th>
+    <th class="th-g gs" colspan="18" style="border-right:2px solid var(--border2);"><input class="th-edit th-grp-title" value="${semGrpLabel()}" title="Clic para editar título de sección" onchange="saveHdrLabel('grp_sem',this.value)" onclick="this.select()" style="color:var(--text);width:100%;background:transparent;"></th>
     <th class="th-g" colspan="3" style="background:#E8F4FB;color:#1A5AA0;border-right:2px solid var(--border2);">Exposiciones / T. Grupal</th>
     <th class="th-g" colspan="1" style="background:#F4EEFF;color:#5B2EA0;border-right:2px solid var(--border2);">Comp.</th>
     <th class="th-g" colspan="3" style="background:#FFF5E0;color:#8A5000;">Evaluación Bimestral <span class="bim-note">General · Solo Director</span></th>
@@ -1436,9 +1458,19 @@ function renderTable(){
   const bimH  = COLS_BIM.map(c=>`<th class="th-g" style="background:#FFF5E0;font-size:9px;font-weight:700;color:#8A5000;">${c.label}</th>`).join('');
 
   // Leaf subheaders
+  // Load custom week labels from memory (saved per context)
+  const ctxKey=`hdrlabels_${grado}_${seccion}_${bimestre}`;
+  const hdrLabels=window._hdrLabels||{};
+  const semLabel=(i)=>hdrLabels[`s${i+1}`]||`S${i+1}`;
+  const semGrpLabel=()=>hdrLabels['grp_sem']||'Notas Semanales + Avance del Libro';
+
   const leafH = Array.from({length:9},(_,i)=>{
     const last=i===8;
-    return`<th class="ths" style="font-size:9px;${last?'border-right:2px solid var(--border2);':''}">S${i+1}</th>
+    return`<th class="ths" style="font-size:9px;${last?'border-right:2px solid var(--border2);':''}">
+             <input class="th-edit" value="${semLabel(i)}" title="Clic para editar título"
+               onchange="saveHdrLabel('s${i+1}',this.value)"
+               onclick="this.select()" style="color:var(--text2);">
+           </th>
            <th style="background:#FFF8EC;font-size:9px;font-weight:700;color:#8A5000;${last?'border-right:2px solid var(--border2);':''}">📚</th>`;
   }).join('');
   const expLeaf  = COLS_EXP.map((c,i)=>`<th class="thv" style="${i===2?'border-right:2px solid var(--border2);':''}">${c.label}</th>`).join('');
@@ -2070,8 +2102,11 @@ let studMgrNames=[];
 let studMgrCtx={grado:'',seccion:''};
 
 async function renderStudentManager(){
-  const grado=document.getElementById('sel-grado').value;
-  const seccion=document.getElementById('sel-seccion').value;
+  // Use independent mgr selectors if available, else fall back to main context
+  const mgrGrado = document.getElementById('mgr-grado');
+  const mgrSeccion = document.getElementById('mgr-seccion');
+  const grado = mgrGrado?.value || studMgrCtx.grado || document.getElementById('sel-grado').value;
+  const seccion = mgrSeccion?.value || studMgrCtx.seccion || document.getElementById('sel-seccion').value;
   studMgrCtx={grado,seccion};
   document.getElementById('stud-mgr-content').innerHTML='<div class="empty">Cargando estudiantes...</div>';
 
@@ -2091,25 +2126,29 @@ async function renderStudentManager(){
 
 function buildStudentMgrUI(){
   const {grado,seccion}=studMgrCtx;
-  const rows=studMgrNames.map((n,i)=>`
+  // Only show rows that have a name OR are the last empty slot
+  const namedOnly = studMgrNames.filter(n=>n&&n.trim()!=='');
+  const rows=namedOnly.map((n,i)=>`
     <div class="stud-input-row" id="stud-row-${i}">
       <span class="stud-num">${i+1}</span>
       <input value="${n||''}" placeholder="Apellidos y nombres" data-si="${i}"
-        oninput="studMgrNames[${i}]=this.value">
-      <button class="btn-del-stud" onclick="removeStudent(${i})" title="Eliminar">✕</button>
+        oninput="namedStudentEdit(${i},this.value)">
+      <button class="btn-del-stud" onclick="removeNamedStudent(${i})" title="Eliminar">✕</button>
     </div>`).join('');
 
   document.getElementById('stud-mgr-content').innerHTML=`
     <div class="stud-mgr">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <h4>📋 Lista de estudiantes — ${grado} Grado · Sección ${seccion}</h4>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button onclick="sortStudentsMgr()" class="btn btn-ghost" style="font-size:12px;padding:6px 12px;">A–Z Ordenar</button>
           <button onclick="saveStudentList()" class="btn btn-green" style="font-size:12px;padding:6px 14px;border:none;">💾 Guardar lista</button>
+          <button onclick="exportStudentListExcel()" style="padding:6px 12px;background:#1D6F42;border:none;border-radius:7px;font-size:12px;font-weight:700;color:white;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">📊 Excel</button>
+          <button onclick="exportStudentListPDF()" style="padding:6px 12px;background:#C0392B;border:none;border-radius:7px;font-size:12px;font-weight:700;color:white;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">📄 PDF</button>
         </div>
       </div>
       <div style="margin-bottom:8px;font-size:11px;color:var(--text3);">
-        ${studMgrNames.length} estudiante(s) registrados · Solo el Director puede modificar esta lista.
+        ${namedOnly.length} estudiante(s) registrados · Solo el Director puede modificar esta lista.
       </div>
       <div id="stud-rows">${rows}</div>
       <div class="stud-input-row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
@@ -2119,15 +2158,16 @@ function buildStudentMgrUI(){
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-top:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Ver otra aula:</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <div class="cf"><label>Ver grado</label>
-          <select onchange="document.getElementById('sel-grado').value=this.value;renderStudentManager();">
+        <div class="cf"><label>Grado</label>
+          <select id="mgr-grado" onchange="studMgrCtx.grado=this.value;renderStudentManager();">
             ${['1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta'].map(g=>`<option ${g===studMgrCtx.grado?'selected':''}>${g}</option>`).join('')}
           </select>
         </div>
-        <div class="cf"><label>Ver sección</label>
-          <select onchange="document.getElementById('sel-seccion').value=this.value;renderStudentManager();">
+        <div class="cf"><label>Sección</label>
+          <select id="mgr-seccion" onchange="studMgrCtx.seccion=this.value;renderStudentManager();">
             ${['A','B','C','D','E','Única'].map(s=>`<option ${s===studMgrCtx.seccion?'selected':''}>${s}</option>`).join('')}
           </select>
         </div>
@@ -2139,6 +2179,27 @@ function addStudent(){
   const inp=document.getElementById('new-stud-input');
   const name=inp.value.trim(); if(!name){toast('Escribe el nombre primero','warn');return;}
   studMgrNames.push(name); inp.value=''; buildStudentMgrUI();
+}
+function removeNamedStudent(namedIdx){
+  const namedOnly=studMgrNames.filter(n=>n&&n.trim()!=='');
+  const name=namedOnly[namedIdx];
+  if(!confirm(`¿Eliminar a "${name}"?`))return;
+  // Find in original array and remove
+  const origIdx=studMgrNames.findIndex((n,i)=>{
+    let cnt=-1;
+    for(let j=0;j<=i;j++) if(studMgrNames[j]&&studMgrNames[j].trim()!=='') cnt++;
+    return cnt===namedIdx;
+  });
+  if(origIdx>=0) studMgrNames.splice(origIdx,1);
+  buildStudentMgrUI();
+}
+function namedStudentEdit(namedIdx,val){
+  const namedOnly=studMgrNames.filter(n=>n&&n.trim()!=='');
+  let cnt=-1;
+  for(let i=0;i<studMgrNames.length;i++){
+    if(studMgrNames[i]&&studMgrNames[i].trim()!=='') cnt++;
+    if(cnt===namedIdx){ studMgrNames[i]=val; return; }
+  }
 }
 function removeStudent(i){
   if(!confirm(`¿Eliminar a "${studMgrNames[i]}"?`))return;
@@ -2782,8 +2843,9 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
 
   // Use uploaded school shield as primary logo
   const shieldSrc = (typeof SCHOOL_SHIELD_B64 !== 'undefined') ? SCHOOL_SHIELD_B64 : '';
+  // Use 'screen' blend: black bg disappears on dark header, colors stay visible
   const instLogoHtml = shieldSrc
-    ?`<img src="${shieldSrc}" style="width:110px;height:110px;object-fit:contain;background:transparent;mix-blend-mode:multiply;">`
+    ?`<img src="${shieldSrc}" style="width:110px;height:110px;object-fit:contain;mix-blend-mode:screen;filter:brightness(1.1) contrast(1.05);">`
     :`<div style="width:110px;height:110px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:white;text-align:center;">LNE</div>`;
 
   // Courses to display (only active visible ones)
@@ -3168,6 +3230,87 @@ function printCurrentRegister(){
       </div>
     </div>
     <script>window.onload=()=>setTimeout(()=>{window.print();},700);<\/script>
+    </body></html>`);
+  w.document.close();
+}
+
+
+// ══════════════════════════════════════════
+//  EDITABLE COLUMN HEADERS
+// ══════════════════════════════════════════
+window._hdrLabels = {};
+
+async function loadHdrLabels(){
+  const {grado,seccion,bimestre}=getCtx();
+  const key=`hdrlabels_${grado}_${seccion}_${bimestre}`;
+  try{
+    const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+    window._hdrLabels=data?JSON.parse(data.valor):{};
+  }catch(e){ window._hdrLabels={}; }
+}
+
+async function saveHdrLabel(k,v){
+  const {grado,seccion,bimestre}=getCtx();
+  const key=`hdrlabels_${grado}_${seccion}_${bimestre}`;
+  window._hdrLabels[k]=v;
+  try{
+    await db.from('configuracion').upsert({id:key,valor:JSON.stringify(window._hdrLabels),updated_at:new Date().toISOString()});
+  }catch(e){ toast('Error guardando etiqueta','err'); }
+}
+
+// ══════════════════════════════════════════
+//  STUDENT LIST EXPORTS (Director)
+// ══════════════════════════════════════════
+function exportStudentListExcel(){
+  const {grado,seccion}=studMgrCtx;
+  const named=studMgrNames.filter(n=>n&&n.trim()!=='');
+  if(!named.length){toast('No hay estudiantes registrados','warn');return;}
+  const rows=[['N°','Apellidos y Nombres'],...named.map((n,i)=>[i+1,n])];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:5},{wch:40}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Estudiantes');
+  XLSX.writeFile(wb,`Lista_${grado}_Sec${seccion}.xlsx`);
+  toast('Excel descargado ✓','ok');
+}
+
+function exportStudentListPDF(){
+  const {grado,seccion}=studMgrCtx;
+  const named=studMgrNames.filter(n=>n&&n.trim()!=='');
+  if(!named.length){toast('No hay estudiantes registrados','warn');return;}
+  const shieldSrc=(typeof SCHOOL_SHIELD_B64!=='undefined')?SCHOOL_SHIELD_B64:'';
+  const logoHtml=shieldSrc?`<img src="${shieldSrc}" style="width:45px;height:45px;object-fit:contain;">`:'';
+  const rows=named.map((n,i)=>`<tr style="background:${i%2===0?'#fff':'#f4f8ff'};">
+    <td style="padding:5px 8px;font-size:11px;text-align:center;border:1px solid #dde3ee;">${i+1}</td>
+    <td style="padding:5px 12px;font-size:12px;border:1px solid #dde3ee;">${n}</td>
+    <td style="padding:5px 8px;border:1px solid #dde3ee;width:80px;"></td>
+  </tr>`).join('');
+  const w=window.open('','_blank','width=700,height=900');
+  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Plus Jakarta Sans',sans-serif;padding:16px;}
+    @page{size:A4;margin:10mm;}@media print{body{padding:0;}}</style></head><body>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:10px;border-bottom:3px solid #1A4E9A;">
+      ${logoHtml}
+      <div>
+        <div style="font-size:15px;font-weight:800;color:#1A4E9A;">I.E. "La Nueva Esperanza" — La Oroya</div>
+        <div style="font-size:12px;color:#555;margin-top:2px;">Lista de Estudiantes — ${grado} Grado · Sección ${seccion}</div>
+        <div style="font-size:11px;color:#888;">${named.length} estudiante(s) · ${new Date().toLocaleDateString('es-PE',{year:'numeric',month:'long',day:'numeric'})}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:#1A4E9A;">
+        <th style="color:white;padding:6px 8px;font-size:10px;border:1px solid #5B9FE0;width:40px;">#</th>
+        <th style="color:white;padding:6px 12px;font-size:10px;text-align:left;border:1px solid #5B9FE0;">Apellidos y Nombres</th>
+        <th style="color:white;padding:6px 8px;font-size:10px;border:1px solid #5B9FE0;width:80px;">Firma</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:20px;display:flex;justify-content:space-between;">
+      <div style="font-size:10px;color:#888;">${named.length} estudiantes matriculados</div>
+      <div style="text-align:center;"><div style="width:140px;border-top:1px solid #000;padding-top:4px;font-size:10px;">Director</div></div>
+    </div>
+    <script>window.onload=()=>setTimeout(()=>{window.print();},600);<\/script>
     </body></html>`);
   w.document.close();
 }
