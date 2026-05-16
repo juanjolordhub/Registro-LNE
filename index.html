@@ -1458,17 +1458,16 @@ function renderTable(){
   const bimH  = COLS_BIM.map(c=>`<th class="th-g" style="background:#FFF5E0;font-size:9px;font-weight:700;color:#8A5000;">${c.label}</th>`).join('');
 
   // Leaf subheaders
-  // Load custom week labels from memory (saved per context)
-  const ctxKey=`hdrlabels_${grado}_${seccion}_${bimestre}`;
+  // Load custom week labels
   const hdrLabels=window._hdrLabels||{};
-  const semLabel=(i)=>hdrLabels[`s${i+1}`]||`S${i+1}`;
+  const semLabel=(si)=>hdrLabels[`s${si+1}`]||`S${si+1}`;
   const semGrpLabel=()=>hdrLabels['grp_sem']||'Notas Semanales + Avance del Libro';
 
-  const leafH = Array.from({length:9},(_,i)=>{
-    const last=i===8;
+  const leafH = Array.from({length:9},(_,si)=>{
+    const last=si===8;
     return`<th class="ths" style="font-size:9px;${last?'border-right:2px solid var(--border2);':''}">
-             <input class="th-edit" value="${semLabel(i)}" title="Clic para editar título"
-               onchange="saveHdrLabel('s${i+1}',this.value)"
+             <input class="th-edit" value="${semLabel(si)}" title="Clic para editar título"
+               onchange="saveHdrLabel('s${si+1}',this.value)"
                onclick="this.select()" style="color:var(--text2);">
            </th>
            <th style="background:#FFF8EC;font-size:9px;font-weight:700;color:#8A5000;${last?'border-right:2px solid var(--border2);':''}">📚</th>`;
@@ -3814,7 +3813,6 @@ function exportDashPDF(){
   w.document.close();
 }
 
-  
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
