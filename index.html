@@ -1340,7 +1340,7 @@ async function loadGrades(){
     toast('Error al cargar: '+e.message,'err');
     // Still render with whatever data we have
   }
-  await loadHdrLabels();
+  try{ await loadHdrLabels(); }catch(e){ window._hdrLabels={}; }
   renderTable();
   renderStats();
   loadNotes();
@@ -3241,9 +3241,9 @@ function printCurrentRegister(){
 window._hdrLabels = {};
 
 async function loadHdrLabels(){
-  const {grado,seccion,bimestre}=getCtx();
-  const key=`hdrlabels_${grado}_${seccion}_${bimestre}`;
   try{
+    const {grado,seccion,bimestre}=getCtx();
+    const key=`hdrlabels_${grado}_${seccion}_${bimestre}`;
     const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
     window._hdrLabels=data?JSON.parse(data.valor):{};
   }catch(e){ window._hdrLabels={}; }
