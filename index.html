@@ -2203,24 +2203,81 @@ async function loadDashboard(){
     // Agregar datos
     const courseAgg={};
     COURSES.forEach(c=>{courseAgg[c.id]={AD:0,A:0,B:0,C:0,sum:0,n:0,teachers:new Set()};});
-    let totalAll=0;
+
+    // For unique student count — track by grado+seccion+studentIdx
+    const uniqueStudents={}; // key: `grado_seccion_idx` → {avgs:[]}
+
+    // Load bimestral data for the selected context
+    let bimDataMap={}; // key: `grado_seccion` → bimGrades object
+    let compDataMap={}; // key: `grado_seccion` → compGrades object
+    try{
+      let bq=db.from('registros').select('grado,seccion,estudiante_nombre')
+        .eq('columna_key','snapshot').eq('curso_id','_bimestral');
+      if(gFil!=='todos')bq=bq.eq('grado',gFil);
+      if(sFil!=='todos')bq=bq.eq('seccion',sFil);
+      if(bFil!=='todos')bq=bq.eq('bimestre',bFil);
+      const {data:bd}=await bq;
+      (bd||[]).forEach(r=>{ bimDataMap[r.grado+'_'+r.seccion]=JSON.parse(r.estudiante_nombre||'{}'); });
+
+      let cq=db.from('registros').select('grado,seccion,estudiante_nombre')
+        .eq('columna_key','snapshot').eq('curso_id','_comportamiento');
+      if(gFil!=='todos')cq=cq.eq('grado',gFil);
+      if(sFil!=='todos')cq=cq.eq('seccion',sFil);
+      if(bFil!=='todos')cq=cq.eq('bimestre',bFil);
+      const {data:cd}=await cq;
+      (cd||[]).forEach(r=>{ compDataMap[r.grado+'_'+r.seccion]=JSON.parse(r.estudiante_nombre||'{}'); });
+    }catch(e){}
 
     (data||[]).forEach(row=>{
       const cid=row.curso_id;
       if(!courseAgg[cid])return;
+      const ctxKey=row.grado+'_'+row.seccion;
+      const bimD=bimDataMap[ctxKey]||{};
+      const compD=compDataMap[ctxKey]||{};
       const g=JSON.parse(row.estudiante_nombre||'{}');
       courseAgg[cid].teachers.add(row.docente_nombre);
-      Object.values(g).forEach(st=>{
+
+      Object.entries(g).forEach(([idx,st])=>{
         if(!st||typeof st!=='object')return;
-        let sw=0,sv=0;
-        COLS.forEach(col=>{const v=st[col.key];if(v!==''&&v!==undefined&&v!==null){sv+=parseInt(v)*col.w;sw+=col.w;}});
-        if(sw){const avg=Math.round(sv/sw);const l=toLetter(avg);courseAgg[cid][l]++;courseAgg[cid].sum+=avg;courseAgg[cid].n++;totalAll++;}
+        // Calc weighted avg using full formula
+        const si=parseInt(idx);
+        const semArr=[]; COLS_SEM.filter(c=>!c.qual).forEach(c=>{const v=parseFloat(st[c.key]);if(!isNaN(v)&&st[c.key]!=='')semArr.push(v);});
+        const expArr=[]; COLS_EXP.forEach(c=>{const v=parseFloat(st[c.key]);if(!isNaN(v)&&st[c.key]!=='')expArr.push(v);});
+        const libArr=[]; COLS_QUAL.forEach(c=>{const n=qualToNum(st[c.key]||'');if(n!==null)libArr.push(n);});
+        const semAvg=semArr.length?semArr.reduce((a,b)=>a+b,0)/semArr.length:null;
+        const expAvg=expArr.length?expArr.reduce((a,b)=>a+b,0)/expArr.length:null;
+        const libAvg=libArr.length?libArr.reduce((a,b)=>a+b,0)/libArr.length:null;
+        const beb1=parseFloat((bimD[si]||{}).eb1),beb2=parseFloat((bimD[si]||{}).eb2),beb3=parseFloat((bimD[si]||{}).eb3);
+        const hb1=!isNaN(beb1),hb2=!isNaN(beb2),hb3=!isNaN(beb3);
+        let p12=null; if(hb1&&hb2)p12=(beb1+beb2)/2; else if(hb1)p12=beb1; else if(hb2)p12=beb2;
+        let bimFin=null; if(p12!==null&&hb3)bimFin=(p12+beb3)/2; else if(p12!==null)bimFin=p12; else if(hb3)bimFin=beb3;
+        const cpRaw=compD[si]??''; const cpv=parseFloat(cpRaw); const cpNum=(!isNaN(cpv)&&cpRaw!=='')?cpv:null;
+        if(semAvg===null&&expAvg===null&&libAvg===null&&bimFin===null&&cpNum===null)return;
+        let tw=0,tv=0;
+        if(semAvg!==null){tv+=semAvg*30;tw+=30;}
+        if(expAvg!==null){tv+=expAvg*20;tw+=20;}
+        if(libAvg!==null){tv+=libAvg*15;tw+=15;}
+        if(bimFin!==null&&!NO_BIM_COURSES.has(cid)){tv+=bimFin*30;tw+=30;}
+        if(cpNum!==null){tv+=cpNum*5;tw+=5;}
+        if(!tw)return;
+        const avg=Math.round((tv/tw)*10)/10;
+        const l=toLetter(avg);
+        courseAgg[cid][l]++;courseAgg[cid].sum+=avg;courseAgg[cid].n++;
+
+        // Track unique student
+        const ukey=ctxKey+'_'+si;
+        if(!uniqueStudents[ukey]) uniqueStudents[ukey]={avgs:[]};
+        uniqueStudents[ukey].avgs.push(avg);
       });
     });
 
+    // Totals based on UNIQUE students (average of their course avgs)
     const totals={AD:0,A:0,B:0,C:0};
-    COURSES.forEach(c=>{const a=courseAgg[c.id];totals.AD+=a.AD;totals.A+=a.A;totals.B+=a.B;totals.C+=a.C;});
-    const totalEv=totals.AD+totals.A+totals.B+totals.C;
+    Object.values(uniqueStudents).forEach(s=>{
+      const avg=s.avgs.reduce((a,b)=>a+b,0)/s.avgs.length;
+      const l=toLetter(avg); totals[l]++;
+    });
+    const totalEv=Object.keys(uniqueStudents).length;
 
     // Docentes activos
     const {data:docs}=await db.from('docentes').select('nombre,rol');
