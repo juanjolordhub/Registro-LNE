@@ -858,6 +858,7 @@ tr:hover td{background:var(--surf3);}
         <div class="cf"><label>Rol</label>
           <select id="nd-rol">
             <option value="docente">Docente</option>
+            <option value="auxiliar">Auxiliar</option>
             <option value="director">Director</option>
           </select>
         </div>
@@ -918,7 +919,7 @@ tr:hover td{background:var(--surf3);}
       <input id="edit-pin" type="password" maxlength="6" placeholder="••••">
     </div>
     <div class="field"><label>Rol</label>
-      <select id="edit-rol"><option value="docente">Docente</option><option value="director">Director</option></select>
+      <select id="edit-rol"><option value="docente">Docente</option><option value="auxiliar">Auxiliar</option><option value="director">Director</option></select>
     </div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
@@ -1119,7 +1120,7 @@ const COLS_BIM  = [
   {key:'eb3',grp:'bim',label:'E.Bim.3',w:2},
 ];
 // Cursos SIN evaluación bimestral
-const NO_BIM_COURSES = new Set(['ef','arte','rob','inf','mot']);
+const NO_BIM_COURSES = new Set(['ef','arte','rob','inf']);
 // Todos los numéricos de curso (para promedio)
 const COLS_NUM  = [...COLS_SEM.filter(c=>!c.qual),...COLS_EXP,...COLS_COMP];
 // Cualitativos de libro
@@ -1376,7 +1377,7 @@ async function showLoginPage(){
   allDocentes.forEach(d=>{
     const o=document.createElement('option');
     o.value=d.nombre;
-    o.textContent=d.nombre+' ('+(d.rol==='director'?'Director':'Docente')+')';
+    o.textContent=d.nombre+' ('+(d.rol==='director'?'Director':d.rol==='auxiliar'?'Auxiliar':'Docente')+')';
     sel.appendChild(o);
   });
   document.getElementById('login-page').style.display='flex';
@@ -1412,27 +1413,32 @@ function showApp(){
   const parts=currentUser.nombre.trim().split(' ');
   av.textContent=(parts[0]?.[0]||'')+(parts[1]?.[0]||'');
   document.getElementById('user-nm').textContent=currentUser.nombre;
-  document.getElementById('user-role').textContent=currentUser.rol==='director'?'Director':'Docente';
+  const rolMap={'director':'Director','auxiliar':'Auxiliar','docente':'Docente'};
+  document.getElementById('user-role').textContent=rolMap[currentUser.rol]||'Docente';
   buildNav();
   showView('notas');
   loadUserCourses().then(()=>{ renderCourseChips(); loadGrades(); });
-  if(currentUser.rol==='director'){
+  const rolActual = currentUser.rol;
+  if(rolActual==='director'||rolActual==='auxiliar'){
     loadDocentesPanel();
   }
   setSyncState('ok','conectado');
   loadLogo();
   // Only director can change logo
   const logoWrap = document.getElementById('tb-logo-wrap');
-  if(logoWrap) logoWrap.style.cursor = currentUser.rol==='director' ? 'pointer' : 'default';
+  if(logoWrap) logoWrap.style.cursor = (currentUser.rol==='director'||currentUser.rol==='auxiliar') ? 'pointer' : 'default';
 }
 
 function buildNav(){
+  const rol = currentUser.rol;
   const tabs=[
     {id:'notas',   label:'📝 Ingreso de notas'},
     {id:'dashboard', label:'📊 Dashboard'},
-    ...(currentUser.rol==='director'?[
-      {id:'boletas',     label:'📄 Boletas de notas'},
+    ...(rol==='director'||rol==='auxiliar'?[
       {id:'estudiantes', label:'📋 Gestionar estudiantes'},
+    ]:[]),
+    ...(rol==='director'?[
+      {id:'boletas',     label:'📄 Boletas de notas'},
       {id:'asignacion',  label:'🗂 Asignar cursos'},
       {id:'docentes',    label:'👥 Gestionar docentes'},
     ]:[])
@@ -1675,7 +1681,7 @@ async function loadGrades(){
 function scheduleSave(){
   // Only save if director OR this is the teacher's own course
   const owner=courseOwnerName;
-  const isDir=currentUser&&currentUser.rol==='director';
+  const isDir=currentUser&&(currentUser.rol==='director'||currentUser.rol==='auxiliar');
   const isOwner=owner===currentUser?.nombre;
   const isFree=!owner;
   if(!isDir&&!isOwner&&!isFree)return;
@@ -1766,7 +1772,7 @@ function renderTable(){
   const oldBanner=document.getElementById('assign-banner');
   if(oldBanner)oldBanner.remove();
 
-  const isDir=currentUser.rol==='director';
+  const isDir=currentUser.rol==='director'||currentUser.rol==='auxiliar';
   const myName=currentUser.nombre;
   const owner=courseOwnerName;
   const courseName=COURSES.find(c=>c.id===activeCourse)?.label||'';
@@ -1791,7 +1797,7 @@ function renderTable(){
     <th class="th-g gs" colspan="18" style="border-right:2px solid var(--border2);">Notas Semanales + Avance del Libro</th>
     <th class="th-g" colspan="3" style="background:#E8F4FB;color:#1A5AA0;border-right:2px solid var(--border2);">Exposiciones / T. Grupal</th>
     <th class="th-g" colspan="1" style="background:#F4EEFF;color:#5B2EA0;border-right:2px solid var(--border2);">Comp.</th>
-    ${!NO_BIM_COURSES.has(activeCourse)?`<th class="th-g" colspan="3" style="background:#FFF5E0;color:#8A5000;">Evaluación Bimestral <span class="bim-note">General · Solo Director</span></th>`:""}
+    ${!NO_BIM_COURSES.has(activeCourse)?`<th class="th-g" colspan="3" style="background:#FFF5E0;color:#8A5000;">Evaluación Bimestral <span class="bim-note">General</span></th>`:""}
     <th rowspan="3" class="th-g gl" style="min-width:58px;">LOGRO</th>`;
 
   // Week subheaders
@@ -1870,7 +1876,11 @@ function renderTable(){
     </td>`;
 
     // Bimestrales — SOLO Director puede editar, y solo si el curso las tiene
-    const canEditBim=isDir;
+    // Director/auxiliar can always edit bimestral
+    // For initial grades (3,4,5 Añitos): the assigned docente can also edit
+    const isAux = currentUser.rol==='auxiliar';
+    const isInicial = ['3 Añitos','4 Añitos','5 Añitos'].includes(grado);
+    const canEditBim = isDir || isAux || (isInicial && owner===currentUser.nombre) || (isInicial && !owner);
     const bimCells=NO_BIM_COURSES.has(activeCourse)?'':COLS_BIM.map((col,bi)=>{
       const v=(bimGrades[i]||{})[col.key]??''; const lv=toLetter(v);
       const bimRattr=canEditBim?'':'readonly style="pointer-events:none;background:var(--surf2)!important;color:var(--text3)!important;border-style:dashed;"';
@@ -2119,7 +2129,7 @@ async function loadDocentesPanel(){
       <div class="doc-av ${d.rol==='director'?'dir':'doc'}">${getInitials(d.nombre)}</div>
       <div class="doc-info">
         <div class="doc-name">${d.nombre}</div>
-        <div class="doc-role"><span class="badge-role ${d.rol==='director'?'br-dir':'br-doc'}">${d.rol==='director'?'Director':'Docente'}</span></div>
+        <div class="doc-role"><span class="badge-role ${d.rol==='director'?'br-dir':d.rol==='auxiliar'?'br-aux':'br-doc'}">${d.rol==='director'?'Director':d.rol==='auxiliar'?'Auxiliar':'Docente'}</span></div>
         <div class="doc-pin">PIN: ${'•'.repeat(4)}</div>
       </div>
       <div class="doc-actions">
