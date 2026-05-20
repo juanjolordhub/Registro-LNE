@@ -1767,6 +1767,7 @@ function showSaveBar(state){
 //  RENDER TABLE
 // ══════════════════════════════════════════
 function renderTable(){
+  const {grado,seccion,bimestre}=getCtx();
   const saveWrap=document.getElementById('save-bar-wrap');
   const dlRow=document.getElementById('dl-row-teacher');
   const oldBanner=document.getElementById('assign-banner');
