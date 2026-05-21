@@ -2242,6 +2242,13 @@ async function loadDashboard(){
     (data||[]).forEach(row=>{
       const cid=row.curso_id;
       if(!courseAgg[cid])return;
+      // Skip empty snapshots — check if there's any real data
+      const rawCheck=JSON.parse(row.estudiante_nombre||'{}');
+      const hasAnyNote=Object.values(rawCheck).some(st=>{
+        if(!st||typeof st!=='object') return false;
+        return COLS_NUM.some(c=>{const v=parseFloat(st[c.key]);return !isNaN(v)&&st[c.key]!==''&&st[c.key]!==undefined;});
+      });
+      if(!hasAnyNote) return; // skip courses with no real grades
       const ctxKey=row.grado+'_'+row.seccion;
       const bimD=bimDataMap[ctxKey]||{};
       const compD=compDataMap[ctxKey]||{};
@@ -3298,16 +3305,18 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
 
   // Courses to display (only active visible ones)
   // Only show courses that have at least one note in any bimestre
+  // Only show courses with at least one real numeric note across all bimestres
   const displayCourses = COURSES.filter(c=>{
-    if(!visibleCourseIds.includes(c.id)) return false;
     return ['I','II','III','IV'].some(bim=>{
-      // Check numeric cols
       const g=boletaData[bim]?.[c.id]||{};
+      // Check if any student has any numeric value in any column
       return Object.values(g).some(row=>{
         if(!row||typeof row!=='object') return false;
         return COLS_NUM.some(col=>{
           const v=(row||{})[col.key];
-          return v!==''&&v!==undefined&&v!==null;
+          if(v===''||v===undefined||v===null) return false;
+          const n=parseFloat(v);
+          return !isNaN(n); // must be a real number
         });
       });
     });
