@@ -306,7 +306,7 @@ tr:hover td{background:var(--surf3);}
 .si-dec:focus{border-color:var(--accent);}
 .si-dec.t-s{background:#F5F9FF;}
 .si-dec.t-ex{background:#EDF6FF;}
-.si-dec.t-bim{background:#FFF5E0;width:50px;border-style:dashed;}
+.si-dec.t-bim{background:#FFF5E0;width:56px;border-style:dashed;border-width:2px;font-size:12px;font-weight:800;}
 .si-dec.t-cp{background:#F8F3FF;}
 .si-dec.vAD{background:var(--ad-bg)!important;color:var(--ad);border-color:var(--ad-br);}
 .si-dec.vA{background:var(--a-bg)!important;color:var(--a);border-color:var(--a-br);}
@@ -336,6 +336,34 @@ tr:hover td{background:var(--surf3);}
 .bpc-scores{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .bpc-score{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;}
 
+
+
+/* ═══════════════════════════════════════
+   ACTITUDINAL SYSTEM
+═══════════════════════════════════════ */
+.act-grid{overflow-x:auto;margin-top:10px;}
+.act-table{border-collapse:collapse;min-width:100%;font-size:10px;}
+.act-table th{background:#1A4E9A;color:white;padding:5px 4px;text-align:center;border:1px solid #3B7DD8;white-space:nowrap;font-size:9px;font-weight:700;}
+.act-table td{border:1px solid #D6E4F7;padding:2px 3px;text-align:center;vertical-align:middle;}
+.act-table tr:nth-child(even) td{background:#F4F8FF;}
+.act-table tr:nth-child(odd) td{background:#FFFFFF;}
+.act-name-cell{text-align:left!important;padding:4px 8px!important;font-size:11px;font-weight:600;min-width:160px;white-space:nowrap;}
+.act-btn{width:34px;height:22px;border-radius:5px;border:1.5px solid var(--border);cursor:pointer;font-size:11px;font-weight:800;transition:all .15s;background:var(--surf2);}
+.act-btn:hover{transform:scale(1.15);}
+.act-btn-AD{background:#D1FAE5!important;border-color:#6EE7B7!important;color:#065F46!important;}
+.act-btn-A{background:#DBEAFE!important;border-color:#93C5FD!important;color:#1E40AF!important;}
+.act-btn-B{background:#FEF3C7!important;border-color:#FCD34D!important;color:#92400E!important;}
+.act-btn-C{background:#FEE2E2!important;border-color:#FCA5A5!important;color:#991B1B!important;}
+.act-obs-btn{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);cursor:pointer;font-size:10px;background:var(--surf2);}
+.act-day-hdr{display:flex;flex-direction:column;align-items:center;gap:1px;}
+.act-day-name{font-size:9px;font-weight:800;color:white;}
+.act-day-date{font-size:8px;color:rgba(255,255,255,.75);}
+.act-week-nav{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.act-week-lbl{font-size:13px;font-weight:700;color:var(--text);min-width:200px;text-align:center;}
+.act-week-btn{padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--surf);font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;}
+.act-week-btn:hover{background:var(--surf2);}
+.act-summary-row td{background:linear-gradient(135deg,#EFF6FF,#DBEAFE)!important;font-weight:800!important;font-size:11px!important;}
+.act-prom-cell{font-size:11px;font-weight:800;font-family:'JetBrains Mono',monospace;}
 
 /* NOTES BOX */
 .notes-box{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);margin-top:14px;}
@@ -634,6 +662,35 @@ tr:hover td{background:var(--surf3);}
 }
 .si-dec{transition:all .15s;}
 
+
+/* BIMESTRE SELECTOR BUTTONS */
+.bim-sel-btn{
+  padding:8px 14px;
+  border-radius:8px;
+  border:2px solid var(--border);
+  background:var(--surf);
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  color:var(--text2);
+  transition:all .2s cubic-bezier(.22,.68,0,1.2);
+  min-width:48px;
+}
+.bim-sel-btn:hover{
+  transform:translateY(-2px);
+  border-color:var(--accent);
+  color:var(--accent);
+  background:var(--accent-l);
+}
+.bim-sel-btn.active{
+  background:linear-gradient(135deg,#1A4E9A,#2563B0);
+  color:white;
+  border-color:#1A4E9A;
+  box-shadow:0 4px 14px rgba(26,78,154,.35);
+  transform:translateY(-2px);
+}
+
 @media(max-width:700px){
   .form-row{grid-template-columns:1fr 1fr;}
   .ctx-row{gap:8px;}
@@ -747,9 +804,9 @@ tr:hover td{background:var(--surf3);}
         <span style="font-size:10px;color:var(--accent);">Comportamiento <b>5%</b></span>
       </span>
     </div>
-    <div class="ctx-row">
+    <div class="ctx-row" style="align-items:center;gap:12px;">
       <div class="cf"><label>Grado</label>
-        <select id="sel-grado" onchange="onCtxChange()">
+        <select id="sel-grado" onchange="onCtxChange()" style="font-size:13px;font-weight:700;padding:6px 10px;">
           <option>3 Añitos</option><option>4 Añitos</option><option>5 Añitos</option>
           <option disabled>──────────</option>
           <option>1°</option><option>2°</option><option selected>3°</option>
@@ -760,18 +817,26 @@ tr:hover td{background:var(--surf3);}
         </select>
       </div>
       <div class="cf"><label>Sección</label>
-        <select id="sel-seccion" onchange="onCtxChange()">
+        <select id="sel-seccion" onchange="onCtxChange()" style="font-size:13px;font-weight:700;padding:6px 10px;">
           <option>A</option><option>B</option><option>C</option>
           <option>D</option><option>E</option><option selected>Única</option>
         </select>
       </div>
-      <div class="cf"><label>Bimestre</label>
-        <select id="sel-bimestre" onchange="onCtxChange()">
-          <option selected>I</option><option>II</option><option>III</option><option>IV</option>
-        </select>
+
+      <!-- BIMESTRE — grande y destacado -->
+      <div class="cf">
+        <label style="font-size:11px;font-weight:800;color:#1A4E9A;letter-spacing:.5px;">📋 BIMESTRE</label>
+        <div style="display:flex;gap:5px;">
+          <button class="bim-sel-btn" id="bsb-I"   onclick="setBimestre('I')"   style="">I</button>
+          <button class="bim-sel-btn" id="bsb-II"  onclick="setBimestre('II')"  style="">II</button>
+          <button class="bim-sel-btn" id="bsb-III" onclick="setBimestre('III')" style="">III</button>
+          <button class="bim-sel-btn" id="bsb-IV"  onclick="setBimestre('IV')"  style="">IV</button>
+        </div>
+        <input type="hidden" id="sel-bimestre" value="I">
       </div>
+
       <div class="cf"><label>N° alumnos</label>
-        <input id="sel-nalum" type="number" min="1" max="45" value="28" style="width:60px;" onchange="onAlumChange()">
+        <input id="sel-nalum" type="number" min="1" max="45" value="28" style="width:60px;font-size:13px;font-weight:700;padding:6px 8px;" onchange="onAlumChange()">
       </div>
       <div class="cf" style="justify-content:flex-end;">
         <label>&nbsp;</label>
@@ -827,6 +892,11 @@ tr:hover td{background:var(--surf3);}
       <div class="empty">Selecciona un curso para comenzar.</div>
     </div>
     <div id="stats-wrap-course"></div>
+  </div>
+
+  <!-- VIEW: ACTITUDINAL -->
+  <div class="view" id="view-actitudinal">
+    <div id="actitudinal-content"><div class="empty">Cargando...</div></div>
   </div>
 
   <!-- VIEW: ESTUDIANTES (Director only) -->
@@ -1432,8 +1502,9 @@ function showApp(){
 function buildNav(){
   const rol = currentUser.rol;
   const tabs=[
-    {id:'notas',   label:'📝 Ingreso de notas'},
-    {id:'dashboard', label:'📊 Dashboard'},
+    {id:'notas',      label:'📝 Ingreso de notas'},
+    {id:'dashboard',  label:'📊 Dashboard'},
+    {id:'actitudinal',label:'🌟 Actitudinal'},
     ...(rol==='director'||rol==='auxiliar'?[
       {id:'estudiantes', label:'📋 Gestionar estudiantes'},
     ]:[]),
@@ -1449,7 +1520,7 @@ function buildNav(){
 }
 
 function showView(id){
-  ['notas','boletas','estudiantes','asignacion','docentes','dashboard'].forEach(v=>{
+  ['notas','boletas','estudiantes','asignacion','docentes','dashboard','actitudinal'].forEach(v=>{
     const el=document.getElementById('view-'+v);
     const tab=document.getElementById('tab-'+v);
     if(el)el.classList.toggle('on',v===id);
@@ -1460,6 +1531,7 @@ function showView(id){
   if(id==='estudiantes')renderStudentManager();
   if(id==='asignacion')renderAssignmentPanel();
   if(id==='boletas')renderBoletasView();
+  if(id==='actitudinal')renderActitudinalView();
 }
 
 // ══════════════════════════════════════════
@@ -1472,7 +1544,26 @@ function getCtx(){
     bimestre:document.getElementById('sel-bimestre').value,
   };
 }
+
+function setBimestre(bim){
+  document.getElementById('sel-bimestre').value=bim;
+  ['I','II','III','IV'].forEach(b=>{
+    const btn=document.getElementById('bsb-'+b);
+    if(btn) btn.classList.toggle('active', b===bim);
+  });
+  onCtxChange();
+}
+
+function initBimButtons(){
+  const cur=document.getElementById('sel-bimestre')?.value||'I';
+  ['I','II','III','IV'].forEach(b=>{
+    const btn=document.getElementById('bsb-'+b);
+    if(btn) btn.classList.toggle('active',b===cur);
+  });
+}
+
 function onCtxChange(){
+  initBimButtons();
   // Cancel any pending saves before switching context
   clearTimeout(saveTimer);
   clearTimeout(saveBimTimer);
@@ -1681,10 +1772,11 @@ async function loadGrades(){
 function scheduleSave(){
   // Only save if director OR this is the teacher's own course
   const owner=courseOwnerName;
-  const isDir=currentUser&&(currentUser.rol==='director'||currentUser.rol==='auxiliar');
+  const isDir=currentUser&&currentUser.rol==='director';
+  const isAux=currentUser&&currentUser.rol==='auxiliar';
   const isOwner=owner===currentUser?.nombre;
   const isFree=!owner;
-  if(!isDir&&!isOwner&&!isFree)return;
+  if(!isDir&&!isAux&&!isOwner&&!isFree)return;
   clearTimeout(saveTimer);
   setSyncState('saving','guardando...');
   showSaveBar('saving');
@@ -1773,17 +1865,20 @@ function renderTable(){
   const oldBanner=document.getElementById('assign-banner');
   if(oldBanner)oldBanner.remove();
 
-  const isDir=currentUser.rol==='director'||currentUser.rol==='auxiliar';
+  const isDir=currentUser.rol==='director';
+  const isAuxiliar=currentUser.rol==='auxiliar';
   const myName=currentUser.nombre;
   const owner=courseOwnerName;
   const courseName=COURSES.find(c=>c.id===activeCourse)?.label||'';
 
   let bannerHtml=''; let canEdit=true;
   if(isDir){
+    // Director: full control
     if(owner) bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-mine">✓ Asignado a: <strong style="margin:0 5px;">${owner}</strong><button class="btn-claim btn-claim-release" onclick="dirReleaseCourse('${activeCourse}')" style="margin-left:auto;">Quitar asignación</button></div>`;
     else bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-free">Este curso no tiene docente asignado aún.</div>`;
     if(dlRow)dlRow.style.display='flex';
   } else {
+    // Auxiliar behaves like docente for course taking
     if(!owner){ bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-free">Curso sin docente asignado. <button class="btn-claim btn-claim-take" onclick="claimCourse('${activeCourse}')" style="margin-left:auto;">✋ Tomar este curso</button></div>`; canEdit=true; if(dlRow)dlRow.style.display='none'; }
     else if(owner===myName){ bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-mine">✓ Tu curso: <strong style="margin:0 4px;">${courseName}</strong><button class="btn-claim btn-claim-release" onclick="releaseCourse('${activeCourse}')" style="margin-left:auto;">Liberar</button></div>`; canEdit=true; if(dlRow)dlRow.style.display='flex'; }
     else { bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-other">⚠️ Asignado a: <strong style="margin:0 5px;">${owner}</strong> — Solo lectura</div>`; canEdit=false; if(dlRow)dlRow.style.display='none'; }
@@ -1798,7 +1893,7 @@ function renderTable(){
     <th class="th-g gs" colspan="18" style="border-right:2px solid var(--border2);">Notas Semanales + Avance del Libro</th>
     <th class="th-g" colspan="3" style="background:#E8F4FB;color:#1A5AA0;border-right:2px solid var(--border2);">Exposiciones / T. Grupal</th>
     <th class="th-g" colspan="1" style="background:#F4EEFF;color:#5B2EA0;border-right:2px solid var(--border2);">Comp.</th>
-    ${!NO_BIM_COURSES.has(activeCourse)?`<th class="th-g" colspan="3" style="background:#FFF5E0;color:#8A5000;">Evaluación Bimestral <span class="bim-note">General</span></th>`:""}
+    ${!NO_BIM_COURSES.has(activeCourse)?`<th class="th-g" colspan="3" style="background:#F59E0B;color:white;font-size:10px;font-weight:800;letter-spacing:.5px;">📋 EVALUACIÓN BIMESTRAL</th>`:""}
     <th rowspan="3" class="th-g gl" style="min-width:58px;">LOGRO</th>`;
 
   // Week subheaders
@@ -1815,7 +1910,7 @@ function renderTable(){
   }).join('');
   const expLeaf  = COLS_EXP.map((c,i)=>`<th class="thv" style="${i===2?'border-right:2px solid var(--border2);':''}">${c.label}</th>`).join('');
   const compLeaf = `<th class="thc" style="border-right:2px solid var(--border2);">Comp.</th>`;
-  const bimLeaf  = !NO_BIM_COURSES.has(activeCourse)?COLS_BIM.map(c=>`<th style="background:#FFF5E0;font-size:9px;font-weight:700;color:#8A5000;border-left:1px solid var(--b-br);">${c.label}</th>`).join(''):'';
+  const bimLeaf  = !NO_BIM_COURSES.has(activeCourse)?COLS_BIM.map((c,bi)=>`<th style="background:#FEF3C7;font-size:10px;font-weight:800;color:#7A5C0A;border-left:${bi===0?'3px':'1px'} solid #F59E0B;min-width:58px;padding:4px 2px;">${c.label}</th>`).join(''):'';
 
   // ── Rows ──
   const rows=Array.from({length:numStudents},(_,i)=>{
@@ -1864,7 +1959,7 @@ function renderTable(){
 
     // Comportamiento — compartido, solo Director edita
     const cpv=(compGrades[i]??''); const cpl=toLetter(cpv);
-    const cpEditable=isDir;
+    const cpEditable=isDir||isAuxiliar;
     const compCell=`<td style="text-align:center;padding:3px 2px;border-right:2px solid var(--border2);">
       <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
         <input type="number" min="0" max="20" step="0.1" class="si-dec t-cp ${cpl?'v'+cpl:''}"
@@ -1879,9 +1974,8 @@ function renderTable(){
     // Bimestrales — SOLO Director puede editar, y solo si el curso las tiene
     // Director/auxiliar can always edit bimestral
     // For initial grades (3,4,5 Añitos): the assigned docente can also edit
-    const isAux = currentUser.rol==='auxiliar';
     const isInicial = ['3 Añitos','4 Añitos','5 Añitos'].includes(grado);
-    const canEditBim = isDir || isAux || (isInicial && owner===currentUser.nombre) || (isInicial && !owner);
+    const canEditBim = isDir || isAuxiliar || (isInicial && owner===currentUser.nombre) || (isInicial && !owner);
     const bimCells=NO_BIM_COURSES.has(activeCourse)?'':COLS_BIM.map((col,bi)=>{
       const v=(bimGrades[i]||{})[col.key]??''; const lv=toLetter(v);
       const bimRattr=canEditBim?'':'readonly style="pointer-events:none;background:var(--surf2)!important;color:var(--text3)!important;border-style:dashed;"';
@@ -2788,41 +2882,73 @@ async function dirReleaseCoursePanel(cid,grado,seccion){
 //  ORDENAR ALFABÉTICAMENTE
 // ══════════════════════════════════════════
 async function sortAlphabetically(){
-  // Build complete student objects from current memory state
-  const students = Array.from({length:numStudents}, (_,i) => ({
-    name:    names[i]||'',
-    grades:  JSON.parse(JSON.stringify(grades[i]||{})),
-    bim:     JSON.parse(JSON.stringify(bimGrades[i]||{})),
-    profile: JSON.parse(JSON.stringify(studentProfiles[i]||{})),
-  }));
+  const {grado,seccion,bimestre}=getCtx();
 
-  // Separate named vs unnamed (empty rows go to bottom)
-  const named   = students.filter(s=>s.name.trim()!=='');
-  const unnamed = students.filter(s=>s.name.trim()==='');
-  named.sort((a,b)=>a.name.trim().localeCompare(b.name.trim(),'es',{sensitivity:'base'}));
-  const sorted = [...named, ...unnamed];
+  // 1. Load ALL courses grades for this context first
+  setSyncState('saving','cargando todos los cursos...');
+  toast('Ordenando... espera un momento','ok');
 
-  // Rebuild all arrays with new order
-  names = sorted.map(s=>s.name);
-  // Keep numStudents as-is (don't shrink — blanks stay at bottom)
-  // Use removeBlankRows() to explicitly remove empty rows
-  document.getElementById('sel-nalum').value = numStudents;
-
-  const newGrades = {}; const newBim = {}; const newProfiles = [];
-  sorted.forEach((s,i)=>{
-    newGrades[i]   = s.grades;
-    newBim[i]      = s.bim;
-    newProfiles[i] = s.profile;
-  });
-  grades          = newGrades;
-  bimGrades       = newBim;
-  studentProfiles = newProfiles;
-
-  // Save EVERYTHING immediately — names, current course grades, bimestral, profiles
-  const {grado,seccion,bimestre} = getCtx();
-  setSyncState('saving','guardando orden...');
+  const allCourseGrades={};
   try{
-    // 1. Save names list
+    for(const course of COURSES){
+      const {data:gr}=await db.from('registros').select('estudiante_nombre')
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+        .eq('curso_id',course.id).eq('columna_key','snapshot').maybeSingle();
+      allCourseGrades[course.id]=gr?JSON.parse(gr.estudiante_nombre)||{}:{};
+    }
+    // Also load bimestral, comp, profiles
+    const {data:bm}=await db.from('registros').select('estudiante_nombre')
+      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+      .eq('curso_id','_bimestral').eq('columna_key','snapshot').maybeSingle();
+    const loadedBim=bm?JSON.parse(bm.estudiante_nombre)||{}:{};
+
+    const {data:cm}=await db.from('registros').select('estudiante_nombre')
+      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+      .eq('curso_id','_comportamiento').eq('columna_key','snapshot').maybeSingle();
+    const loadedComp=cm?JSON.parse(cm.estudiante_nombre)||{}:{};
+
+    const profKey=`profiles_${grado}_${seccion}`;
+    const {data:pr}=await db.from('configuracion').select('valor').eq('id',profKey).maybeSingle();
+    const loadedProfiles=pr?JSON.parse(pr.valor)||[]:[];
+
+    // 2. Build student objects with ALL their data
+    const students=Array.from({length:numStudents},(_,i)=>({
+      name:    names[i]||'',
+      bim:     JSON.parse(JSON.stringify(loadedBim[i]||{})),
+      comp:    loadedComp[i]??'',
+      profile: JSON.parse(JSON.stringify(loadedProfiles[i]||{})),
+      courses: {},
+    }));
+    COURSES.forEach(c=>{
+      students.forEach((s,i)=>{ s.courses[c.id]=JSON.parse(JSON.stringify(allCourseGrades[c.id][i]||{})); });
+    });
+
+    // 3. Sort: named students A-Z, unnamed go to bottom
+    const named   = students.filter(s=>s.name.trim()!=='');
+    const unnamed = students.filter(s=>s.name.trim()==='');
+    named.sort((a,b)=>a.name.trim().localeCompare(b.name.trim(),'es',{sensitivity:'base'}));
+    const sorted=[...named,...unnamed];
+
+    // 4. Rebuild all arrays with new order
+    names=[]; grades={}; bimGrades={}; compGrades={}; studentProfiles=[];
+    const newCourseGrades={};
+    COURSES.forEach(c=>{ newCourseGrades[c.id]={}; });
+
+    sorted.forEach((s,newIdx)=>{
+      names[newIdx]    = s.name;
+      bimGrades[newIdx]= s.bim;
+      compGrades[newIdx]= s.comp;
+      studentProfiles[newIdx]=s.profile;
+      COURSES.forEach(c=>{ newCourseGrades[c.id][newIdx]=s.courses[c.id]; });
+    });
+    grades=newCourseGrades[activeCourse]||{};
+    numStudents=Math.max(named.length,1);
+    document.getElementById('sel-nalum').value=numStudents;
+
+    // 5. Save EVERYTHING to Supabase
+    setSyncState('saving','guardando orden en todos los cursos...');
+
+    // Save names
     await db.from('registros').delete()
       .eq('grado',grado).eq('seccion',seccion)
       .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot');
@@ -2834,19 +2960,21 @@ async function sortAlphabetically(){
       updated_at:new Date().toISOString()
     });
 
-    // 2. Save current course grades with new order
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-      .eq('curso_id',activeCourse).eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre,curso_id:activeCourse,
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify(grades),
-      docente_nombre:currentUser.nombre,
-      updated_at:new Date().toISOString()
-    });
+    // Save all courses
+    for(const course of COURSES){
+      await db.from('registros').delete()
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+        .eq('curso_id',course.id).eq('columna_key','snapshot');
+      await db.from('registros').insert({
+        grado,seccion,bimestre,curso_id:course.id,
+        estudiante_idx:-1,columna_key:'snapshot',
+        estudiante_nombre:JSON.stringify(newCourseGrades[course.id]),
+        docente_nombre:currentUser.nombre,
+        updated_at:new Date().toISOString()
+      });
+    }
 
-    // 3. Save bimestral with new order
+    // Save bimestral
     await db.from('registros').delete()
       .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
       .eq('curso_id','_bimestral').eq('columna_key','snapshot');
@@ -2858,82 +2986,55 @@ async function sortAlphabetically(){
       updated_at:new Date().toISOString()
     });
 
-    // 4. Save profiles with new order
-    const profKey=`profiles_${grado}_${seccion}`;
+    // Save comp
+    await db.from('registros').delete()
+      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+      .eq('curso_id','_comportamiento').eq('columna_key','snapshot');
+    await db.from('registros').insert({
+      grado,seccion,bimestre,curso_id:'_comportamiento',
+      estudiante_idx:-1,columna_key:'snapshot',
+      estudiante_nombre:JSON.stringify(compGrades),
+      docente_nombre:currentUser.nombre,
+      updated_at:new Date().toISOString()
+    });
+
+    // Save profiles
     await db.from('configuracion').upsert({
-      id:profKey,
-      valor:JSON.stringify(studentProfiles),
+      id:profKey,valor:JSON.stringify(studentProfiles),
       updated_at:new Date().toISOString()
     });
 
     setSyncState('ok','orden guardado ✓');
-    toast('✓ Lista ordenada A–Z y guardada','ok');
-
-    // ⚠️ IMPORTANT: Re-order ALL other courses in Supabase too
-    // We do this in background for all courses that have data
-    reorderAllCourses(grado, seccion, bimestre, sorted);
+    toast('✓ Lista ordenada A–Z en TODOS los cursos','ok');
+    renderTable();
+    renderStats();
 
   }catch(e){
-    setSyncState('error','error al guardar');
-    toast('Error al guardar orden: '+e.message,'err');
-  }
-
-  renderTable();
-}
-
-// Re-order all other courses to match new student order
-async function reorderAllCourses(grado, seccion, bimestre, sortedStudents){
-  for(const course of COURSES){
-    if(course.id===activeCourse) continue; // already saved
-    try{
-      const {data:gr}=await db.from('registros').select('estudiante_nombre')
-        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-        .eq('curso_id',course.id).eq('columna_key','snapshot').maybeSingle();
-      if(!gr) continue;
-      const oldGrades=JSON.parse(gr.estudiante_nombre)||{};
-      // oldGrades keys are old indices — we need to remap using original order
-      // We stored the original student data in sortedStudents (they came from memory
-      // which was loaded from the CURRENT course). For other courses we load from DB.
-      // The old indices match the original names array before sort.
-      // sortedStudents[newIdx].originalIdx is not tracked, so we do name-based matching
-      // Actually we need to rebuild: find each student's old position by name
-      const nameToOldIdx = {};
-      // The original names before sort were: sorted is the NEW order
-      // We need the ORIGINAL names — which we don't have anymore after sort.
-      // Solution: use the DB data which still has old order
-      // Actually grades for other courses are keyed 0..N and matched names 0..N
-      // After sort, names[newIdx] = sortedStudents[newIdx].name
-      // oldGrades[oldIdx] belongs to the student at names_before[oldIdx]
-      // We need names_before — which we no longer have in memory.
-      // WORKAROUND: skip if we can't safely remap. The docente of that course
-      // will see a note and can re-sort/re-save.
-      // Better: we saved the sorted order. Compare names in DB snapshot to rematch.
-      // For now just mark it as needing re-sort by leaving it — docente will re-save.
-    }catch(e){}
+    setSyncState('error','error');
+    toast('Error al ordenar: '+e.message,'err');
   }
 }
 
 
-// ══════════════════════════════════════════
-//  ELIMINAR FILAS VACÍAS
-// ══════════════════════════════════════════
 async function removeBlankRows(){
   const filled = Array.from({length:numStudents},(_,i)=>i).filter(i=>names[i]&&names[i].trim()!=='');
   if(filled.length===numStudents){ toast('No hay filas vacías','ok'); return; }
   const removed = numStudents - filled.length;
   if(!confirm(`¿Eliminar ${removed} fila(s) vacía(s)? Las notas de esas filas también se eliminarán.`)) return;
 
-  // Rebuild arrays keeping only filled rows
-  const newNames=[]; const newGrades={}; const newBim={}; const newProfiles=[];
+  // Rebuild arrays keeping only filled rows — same remapping logic as sort
+  const newNames=[]; const newGrades={}; const newBim={}; const newComp={}; const newProfiles=[];
   filled.forEach((oldIdx,newIdx)=>{
     newNames[newIdx]    = names[oldIdx];
     newGrades[newIdx]   = JSON.parse(JSON.stringify(grades[oldIdx]||{}));
     newBim[newIdx]      = JSON.parse(JSON.stringify(bimGrades[oldIdx]||{}));
+    newComp[newIdx]     = compGrades[oldIdx]??'';
     newProfiles[newIdx] = JSON.parse(JSON.stringify(studentProfiles[oldIdx]||{}));
   });
   names           = newNames;
   grades          = newGrades;
   bimGrades       = newBim;
+  compGrades      = newComp;
   studentProfiles = newProfiles;
   numStudents     = filled.length;
   document.getElementById('sel-nalum').value = numStudents;
@@ -3412,13 +3513,8 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
     <div style="height:6px;background:linear-gradient(90deg,#1A4E9A,#4A7EC7,#1A4E9A);width:100%;"></div>
     <div style="padding:8mm 10mm 8mm;">
 
-    <!-- WAVE BG decoration -->
-    <div style="position:absolute;bottom:0;left:0;right:0;height:35mm;overflow:hidden;z-index:0;">
-      <svg viewBox="0 0 800 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
-        <path d="M0,70 C200,10 400,130 600,70 C700,40 750,50 800,70 L800,140 L0,140 Z" fill="${LBLU}" opacity=".5"/>
-        <path d="M0,90 C150,40 350,120 550,80 C650,60 750,80 800,90 L800,140 L0,140 Z" fill="${LBLU}" opacity=".7"/>
-      </svg>
-    </div>
+    <!-- BOTTOM ACCENT LINE instead of waves (no print artifacts) -->
+    <div style="position:absolute;bottom:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#1A4E9A,#4A7EC7,#1A4E9A);z-index:0;"></div>
 
     <div style="position:relative;z-index:1;">
     <!-- HEADER -->
@@ -3700,6 +3796,378 @@ window._hdrLabels = {};
 
 
 
+
+
+// ══════════════════════════════════════════
+//  SISTEMA ACTITUDINAL DIARIO
+// ══════════════════════════════════════════
+// Criterios: Asistencia, Puntualidad, Uniformidad, Disciplina
+// Escala: AD(20)=Cumplió Bien, A(17)=Cumplió, B(13)=Cumplió a medias, C(5)=No cumplió
+// Storage: configuracion table, key: act_{grado}_{seccion}_{bimestre}_{YYYY-W##}
+
+const ACT_CRITERIOS = [
+  {key:'asi', label:'Asistencia',   icon:'🙋'},
+  {key:'pun', label:'Puntualidad',  icon:'⏰'},
+  {key:'uni', label:'Uniformidad',  icon:'👕'},
+  {key:'dis', label:'Disciplina',   icon:'📏'},
+];
+const ACT_VALS = {
+  'AD': {label:'Cumplió Bien',     num:20, short:'AD'},
+  'A':  {label:'Cumplió',          num:17, short:'A'},
+  'B':  {label:'A medias',         num:13, short:'B'},
+  'C':  {label:'No cumplió',       num:5,  short:'C'},
+  '':   {label:'Sin registrar',    num:null, short:'—'},
+};
+const ACT_CYCLE = ['','AD','A','B','C'];
+
+let actData = {};       // actData[weekKey][studentIdx][criterio] = 'AD'|'A'|'B'|'C'|''
+let actWeekOffset = 0;  // 0 = current week, -1 = prev, etc
+let actCtx = {grado:'',seccion:'',bimestre:''};
+
+function getWeekKey(offset=0){
+  const d=new Date();
+  d.setDate(d.getDate() + offset*7);
+  const year=d.getFullYear();
+  // ISO week number
+  const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  tmp.setUTCDate(tmp.getUTCDate()+4-(tmp.getUTCDay()||7));
+  const yearStart=new Date(Date.UTC(tmp.getUTCFullYear(),0,1));
+  const week=Math.ceil((((tmp-yearStart)/86400000)+1)/7);
+  return `${year}-W${String(week).padStart(2,'0')}`;
+}
+
+function getWeekDates(offset=0){
+  const d=new Date();
+  d.setDate(d.getDate() + offset*7);
+  // Monday of that week
+  const day=d.getDay()||7;
+  d.setDate(d.getDate()-day+1);
+  const days=[];
+  const dayNames=['Lun','Mar','Mié','Jue','Vie'];
+  for(let i=0;i<5;i++){
+    const dd=new Date(d);
+    dd.setDate(d.getDate()+i);
+    days.push({
+      name:dayNames[i],
+      date:dd.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'}),
+      key:dd.toISOString().slice(0,10)
+    });
+  }
+  return days;
+}
+
+async function renderActitudinalView(){
+  const grado=document.getElementById('sel-grado').value;
+  const seccion=document.getElementById('sel-seccion').value;
+  const bimestre=document.getElementById('sel-bimestre').value;
+  actCtx={grado,seccion,bimestre};
+
+  document.getElementById('actitudinal-content').innerHTML=`
+    <div class="boleta-controls">
+      <h3>🌟 Registro Actitudinal Diario</h3>
+      <div class="ctx-row" style="margin-bottom:10px;">
+        <div class="cf"><label>Grado</label>
+          <select id="act-grado" onchange="onActCtxChange()">
+            ${['3 Añitos','4 Añitos','5 Añitos','1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta']
+              .map(g=>`<option ${g===grado?'selected':''}>${g}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cf"><label>Sección</label>
+          <select id="act-seccion" onchange="onActCtxChange()">
+            ${['A','B','C','D','E','Única'].map(s=>`<option ${s===seccion?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cf"><label>Bimestre</label>
+          <select id="act-bimestre" onchange="onActCtxChange()">
+            ${['I','II','III','IV'].map(b=>`<option ${b===bimestre?'selected':''}>${b}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:11px;color:var(--text2);">
+          <span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;">
+            <span class="act-btn act-btn-AD" style="display:inline-block;width:22px;height:16px;line-height:16px;font-size:9px;text-align:center;border-radius:3px;">AD</span> Cumplió Bien (20)
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;">
+            <span class="act-btn act-btn-A" style="display:inline-block;width:22px;height:16px;line-height:16px;font-size:9px;text-align:center;border-radius:3px;">A</span> Cumplió (17)
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;">
+            <span class="act-btn act-btn-B" style="display:inline-block;width:22px;height:16px;line-height:16px;font-size:9px;text-align:center;border-radius:3px;">B</span> A medias (13)
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:4px;">
+            <span class="act-btn act-btn-C" style="display:inline-block;width:22px;height:16px;line-height:16px;font-size:9px;text-align:center;border-radius:3px;">C</span> No cumplió (5)
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div id="act-week-area"></div>
+
+    <div class="card" style="margin-top:12px;">
+      <h4 style="font-size:12px;font-weight:800;margin-bottom:12px;color:var(--text2);">📊 Promedio Actitudinal del Bimestre</h4>
+      <div id="act-summary-area"><div class="empty">Cargando resumen...</div></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        <button onclick="applyActToComportamiento()" 
+          style="padding:8px 20px;background:var(--accent);border:none;border-radius:8px;font-size:13px;font-weight:700;color:white;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">
+          💾 Aplicar como nota de Comportamiento
+        </button>
+        <p style="font-size:11px;color:var(--text3);margin-top:6px;">
+          * Calcula el promedio de los 4 criterios en todas las semanas y lo guarda como la nota de Comportamiento de cada estudiante.
+        </p>
+      </div>
+    </div>`;
+
+  await loadActitudinalWeek();
+}
+
+function onActCtxChange(){
+  actCtx={
+    grado:document.getElementById('act-grado').value,
+    seccion:document.getElementById('act-seccion').value,
+    bimestre:document.getElementById('act-bimestre').value,
+  };
+  actWeekOffset=0;
+  loadActitudinalWeek();
+}
+
+async function loadActitudinalWeek(){
+  const wk=getWeekKey(actWeekOffset);
+  const key=`act_${actCtx.grado}_${actCtx.seccion}_${actCtx.bimestre}_${wk}`;
+  try{
+    const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+    actData[wk]=data?JSON.parse(data.valor):{};
+  }catch(e){ actData[wk]={}; }
+
+  // Also load all weeks for summary
+  renderActWeek();
+  loadActSummary();
+}
+
+async function saveActitudinalWeek(){
+  const wk=getWeekKey(actWeekOffset);
+  const key=`act_${actCtx.grado}_${actCtx.seccion}_${actCtx.bimestre}_${wk}`;
+  try{
+    await db.from('configuracion').upsert({id:key,valor:JSON.stringify(actData[wk]||{}),updated_at:new Date().toISOString()});
+  }catch(e){ toast('Error guardando actitudinal','err'); }
+}
+
+function cycleActBtn(btn,si,dayKey,crit){
+  const cur=((actData[getWeekKey(actWeekOffset)]||{})[si]||{})[dayKey]?.[crit]||'';
+  const idx=ACT_CYCLE.indexOf(cur);
+  const next=ACT_CYCLE[(idx+1)%ACT_CYCLE.length];
+  const wk=getWeekKey(actWeekOffset);
+  if(!actData[wk])actData[wk]={};
+  if(!actData[wk][si])actData[wk][si]={};
+  if(!actData[wk][si][dayKey])actData[wk][si][dayKey]={};
+  actData[wk][si][dayKey][crit]=next;
+  // Update button style
+  btn.textContent=next||'—';
+  btn.className='act-btn'+(next?' act-btn-'+next:'');
+  clearTimeout(window._actSaveTimer);
+  window._actSaveTimer=setTimeout(saveActitudinalWeek,1000);
+  // Update row summary
+  updateActRowSummary(si);
+}
+
+function updateActRowSummary(si){
+  const wk=getWeekKey(actWeekOffset);
+  const nums=[];
+  const days=getWeekDates(actWeekOffset);
+  days.forEach(d=>{
+    ACT_CRITERIOS.forEach(c=>{
+      const v=actData[wk]?.[si]?.[d.key]?.[c.key]||'';
+      const n=ACT_VALS[v]?.num;
+      if(n!==null&&n!==undefined)nums.push(n);
+    });
+  });
+  const avg=nums.length?Math.round(nums.reduce((a,b)=>a+b,0)/nums.length*10)/10:null;
+  const el=document.getElementById(`act-week-avg-${si}`);
+  if(el){
+    const l=avg!==null?toLetter(avg):'';
+    el.textContent=avg!==null?`${avg} ${l}`:'—';
+    el.className=`act-prom-cell lb-${l||'e'}`;
+  }
+}
+
+function renderActWeek(){
+  const days=getWeekDates(actWeekOffset);
+  const wk=getWeekKey(actWeekOffset);
+  const weekArea=document.getElementById('act-week-area');
+  if(!weekArea)return;
+
+  // Load names from current context
+  const nameList=names.length>0?names:Array.from({length:numStudents},(_,i)=>`Estudiante ${i+1}`);
+  const students=nameList.map((n,i)=>({name:n,idx:i})).filter(s=>s.name&&s.name.trim()!=='');
+
+  // Build header: day columns × 4 criteria
+  const dayHeaders=days.map(d=>`
+    <th colspan="4" style="background:#1A4E9A;color:white;padding:4px;border:1px solid #3B7DD8;text-align:center;">
+      <div class="act-day-hdr"><span class="act-day-name">${d.name}</span><span class="act-day-date">${d.date}</span></div>
+    </th>`).join('');
+
+  const critHeaders=days.map(()=>
+    ACT_CRITERIOS.map(c=>`<th style="background:#2563B0;color:white;padding:3px 2px;border:1px solid #3B7DD8;font-size:8px;" title="${c.label}">${c.icon}</th>`).join('')
+  ).join('');
+
+  const rows=students.map(s=>{
+    const si=s.idx;
+    const dayCells=days.map(d=>
+      ACT_CRITERIOS.map(c=>{
+        const v=actData[wk]?.[si]?.[d.key]?.[c.key]||'';
+        return`<td style="padding:1px 2px;border:1px solid #D6E4F7;">
+          <button class="act-btn${v?' act-btn-'+v:''}" 
+            onclick="cycleActBtn(this,${si},'${d.key}','${c.key}')"
+            title="${ACT_VALS[v]?.label||'Sin registrar'}">${v||'—'}</button>
+        </td>`;
+      }).join('')
+    ).join('');
+
+    // Weekly avg for this student
+    const nums=[];
+    days.forEach(d=>{ ACT_CRITERIOS.forEach(c=>{ const n=ACT_VALS[actData[wk]?.[si]?.[d.key]?.[c.key]||'']?.num; if(n!=null)nums.push(n); }); });
+    const avg=nums.length?Math.round(nums.reduce((a,b)=>a+b,0)/nums.length*10)/10:null;
+    const l=avg!==null?toLetter(avg):'';
+
+    return`<tr>
+      <td class="act-name-cell">${s.name}</td>
+      ${dayCells}
+      <td style="padding:3px;border:1px solid #D6E4F7;background:#F0F7FF;">
+        <span id="act-week-avg-${si}" class="act-prom-cell ${l?'lb-'+l:'lb-e'}">${avg!==null?avg+' '+l:'—'}</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const weekLabel=`Semana del ${days[0].date} al ${days[4].date}`;
+
+  weekArea.innerHTML=`
+    <div class="act-week-nav" style="margin-top:14px;">
+      <button class="act-week-btn" onclick="actWeekOffset--;loadActitudinalWeek()">← Anterior</button>
+      <span class="act-week-lbl">📅 ${weekLabel}</span>
+      <button class="act-week-btn" onclick="actWeekOffset++;loadActitudinalWeek()">Siguiente →</button>
+    </div>
+    <div class="act-grid">
+      <table class="act-table">
+        <thead>
+          <tr>
+            <th rowspan="2" style="background:#1A4E9A;color:white;padding:5px 8px;border:1px solid #3B7DD8;text-align:left;min-width:160px;">ESTUDIANTE</th>
+            ${dayHeaders}
+            <th rowspan="2" style="background:#1A4E9A;color:white;padding:5px 4px;border:1px solid #3B7DD8;min-width:55px;">Prom.<br>Semana</th>
+          </tr>
+          <tr>${critHeaders}</tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+async function loadActSummary(){
+  const {grado,seccion,bimestre}=actCtx;
+  // Load all 9 weeks data
+  const allData={};
+  const promises=Array.from({length:12},(_,i)=>{
+    const wk=getWeekKey(-i);
+    const key=`act_${grado}_${seccion}_${bimestre}_${wk}`;
+    return db.from('configuracion').select('valor').eq('id',key).maybeSingle()
+      .then(({data})=>{ if(data)allData[wk]=JSON.parse(data.valor)||{}; });
+  });
+  await Promise.all(promises);
+
+  const nameList=names.length>0?names:[];
+  const students=nameList.map((n,i)=>({name:n,idx:i})).filter(s=>s.name&&s.name.trim()!=='');
+
+  const summaryRows=students.map(s=>{
+    const si=s.idx;
+    const nums=[];
+    Object.values(allData).forEach(wkData=>{
+      Object.values(wkData[si]||{}).forEach(dayData=>{
+        ACT_CRITERIOS.forEach(c=>{
+          const n=ACT_VALS[dayData[c.key]||'']?.num;
+          if(n!=null)nums.push(n);
+        });
+      });
+    });
+    const avg=nums.length?Math.round(nums.reduce((a,b)=>a+b,0)/nums.length*10)/10:null;
+    const l=avg!==null?toLetter(avg):'';
+    const bg={'AD':'#D1FAE5','A':'#DBEAFE','B':'#FEF3C7','C':'#FEE2E2'}[l]||'#F9F9F9';
+    const tx={'AD':'#065F46','A':'#1E40AF','B':'#92400E','C':'#991B1B'}[l]||'#666';
+    return`<tr>
+      <td style="padding:5px 10px;font-size:12px;font-weight:600;border:1px solid #D6E4F7;">${s.name}</td>
+      <td style="text-align:center;background:${bg};border:1px solid #D6E4F7;">
+        <span style="color:${tx};font-weight:800;font-family:'JetBrains Mono',monospace;font-size:12px;">${avg!==null?avg:'—'}</span>
+      </td>
+      <td style="text-align:center;background:${bg};border:1px solid #D6E4F7;">
+        <span style="color:${tx};font-weight:800;font-size:12px;">${l||'—'}</span>
+      </td>
+      <td style="padding:5px 8px;font-size:11px;color:var(--text2);border:1px solid #D6E4F7;">${nums.length} registros</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('act-summary-area').innerHTML=`
+    <table style="border-collapse:collapse;width:100%;max-width:600px;">
+      <thead><tr>
+        <th style="background:#1A4E9A;color:white;padding:6px 10px;text-align:left;border:1px solid #3B7DD8;font-size:11px;">Estudiante</th>
+        <th style="background:#1A4E9A;color:white;padding:6px;text-align:center;border:1px solid #3B7DD8;font-size:11px;">Promedio</th>
+        <th style="background:#1A4E9A;color:white;padding:6px;text-align:center;border:1px solid #3B7DD8;font-size:11px;">Nivel</th>
+        <th style="background:#1A4E9A;color:white;padding:6px;text-align:center;border:1px solid #3B7DD8;font-size:11px;">Datos</th>
+      </tr></thead>
+      <tbody>${summaryRows||'<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text3);">Sin registros aún</td></tr>'}</tbody>
+    </table>`;
+}
+
+async function applyActToComportamiento(){
+  const {grado,seccion,bimestre}=actCtx;
+  // Load all weeks
+  const allData={};
+  const promises=Array.from({length:12},(_,i)=>{
+    const wk=getWeekKey(-i);
+    const key=`act_${grado}_${seccion}_${bimestre}_${wk}`;
+    return db.from('configuracion').select('valor').eq('id',key).maybeSingle()
+      .then(({data})=>{ if(data)allData[wk]=JSON.parse(data.valor)||{}; });
+  });
+  await Promise.all(promises);
+
+  // Calculate avg per student
+  const newCompGrades={};
+  names.forEach((name,si)=>{
+    if(!name||!name.trim())return;
+    const nums=[];
+    Object.values(allData).forEach(wkData=>{
+      Object.values(wkData[si]||{}).forEach(dayData=>{
+        ACT_CRITERIOS.forEach(c=>{
+          const n=ACT_VALS[dayData[c.key]||'']?.num;
+          if(n!=null)nums.push(n);
+        });
+      });
+    });
+    if(nums.length){
+      newCompGrades[si]=Math.round(nums.reduce((a,b)=>a+b,0)/nums.length*10)/10;
+    }
+  });
+
+  // Save to _comportamiento
+  try{
+    await db.from('registros').delete()
+      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+      .eq('curso_id','_comportamiento').eq('columna_key','snapshot');
+    await db.from('registros').insert({
+      grado,seccion,bimestre,curso_id:'_comportamiento',
+      estudiante_idx:-1,columna_key:'snapshot',
+      estudiante_nombre:JSON.stringify(newCompGrades),
+      docente_nombre:currentUser.nombre,
+      updated_at:new Date().toISOString()
+    });
+    // Update in memory if same context
+    if(grado===document.getElementById('sel-grado').value &&
+       seccion===document.getElementById('sel-seccion').value &&
+       bimestre===document.getElementById('sel-bimestre').value){
+      compGrades={...newCompGrades};
+      renderTable();
+    }
+    toast(`✓ Comportamiento actualizado para ${Object.keys(newCompGrades).length} estudiantes`,'ok');
+    loadActSummary();
+  }catch(e){ toast('Error: '+e.message,'err'); }
+}
 
 // ══════════════════════════════════════════
 //  CAMBIAR PROPIO PIN
