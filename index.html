@@ -3508,7 +3508,7 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
   const pfNBg=pfNivel?cc[pfNivel]:LBLU; const pfNTx=pfNivel?ct[pfNivel]:'#A09890';
 
   return `
-  <div style="width:277mm;min-height:190mm;padding:0;background:white;font-family:'Plus Jakarta Sans',sans-serif;page-break-after:always;box-sizing:border-box;position:relative;overflow:hidden;">
+  <div style="width:277mm;padding:0;background:white;font-family:'Plus Jakarta Sans',sans-serif;box-sizing:border-box;position:relative;overflow:hidden;">
     <!-- TOP STRIPE -->
     <div style="height:6px;background:linear-gradient(90deg,#1A4E9A,#4A7EC7,#1A4E9A);width:100%;"></div>
     <div style="padding:8mm 10mm 8mm;">
@@ -3622,13 +3622,21 @@ function openPrintWindow(pages, orientation='landscape'){
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;padding:0;}
-      body{background:#CCC;font-family:'Plus Jakarta Sans',sans-serif;}
+      html,body{background:white;font-family:'Plus Jakarta Sans',sans-serif;}
       @page{size:A4 ${orientation};margin:0;}
       @media print{
-        body{background:white;}
-        .page-wrap{box-shadow:none!important;margin:0!important;width:100%!important;}
+        html,body{background:white!important;}
+        .page-wrap{box-shadow:none!important;margin:0!important;page-break-after:always;page-break-inside:avoid;}
+        .page-wrap:last-child{page-break-after:auto;}
       }
-      .page-wrap{background:white;width:${orientation==='landscape'?'277mm':'210mm'};margin:12px auto;box-shadow:0 4px 30px rgba(0,0,0,.22);overflow:hidden;}
+      .page-wrap{
+        background:white;
+        width:${orientation==='landscape'?'277mm':'210mm'};
+        margin:0 auto 20px;
+        box-shadow:0 4px 30px rgba(0,0,0,.18);
+        overflow:hidden;
+        page-break-after:always;
+      }
     </style>
     </head><body>
     ${pages.map(p=>`<div class="page-wrap">${p}</div>`).join('')}
