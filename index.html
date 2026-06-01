@@ -3154,7 +3154,7 @@ async function renderBoletasView(){
       <div class="ctx-row" style="margin-bottom:12px;">
         <div class="cf"><label>Grado</label>
           <select id="bol-grado" onchange="onBoletaGradoChange()">
-            ${['1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta']
+            ${['3 Añitos','4 Añitos','5 Añitos','1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta']
               .map(g=>`<option ${g===boletaCtxGrado?'selected':''}>${g}</option>`).join('')}
           </select>
         </div>
