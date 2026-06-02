@@ -797,11 +797,9 @@ tr:hover td{background:var(--surf3);}
         <span style="color:var(--border2);">·</span>
         <span style="font-size:10px;color:var(--accent);">Expo <b>30%</b></span>
         <span style="color:var(--border2);">·</span>
-        <span style="font-size:10px;color:var(--accent);">Libro <b>15%</b></span>
-        <span style="color:var(--border2);">·</span>
-        <span style="font-size:10px;color:var(--accent);">E.Bimestral <b>10%</b></span>
-        <span style="color:var(--border2);">·</span>
         <span style="font-size:10px;color:var(--accent);">Comportamiento <b>5%</b></span>
+        <span style="color:var(--border2);margin-left:6px;">|</span>
+        <span style="font-size:10px;color:var(--text3);margin-left:6px;">Libro y E.Bimestral: solo referencia</span>
       </span>
     </div>
     <div class="ctx-row" style="align-items:center;gap:12px;">
@@ -1230,16 +1228,16 @@ let dashData = {};
 function qualToNum(q){ return q==='C'?20:q==='M'?10:q==='N'?0:null; }
 
 // ── Promedio ponderado CNB 2026 ──
-// Semanas 40% + Exposiciones 30% + Libro 15% = 85%
-// Eval.Bimestral 10% (general) · Comportamiento 5%
+// Semanas 30% + Exposiciones 20% + Libro 15% = 65%
+// Eval.Bimestral 10% c/u (3 = 30%) · Comportamiento 5%
 function wAvg(i, bimData){
   const g=grades[i]||{};
 
-  // ── Semanas numéricas = 40% ──
+  // ── Semanas numéricas = 30% ──
   const semArr=[]; COLS_SEM.filter(c=>!c.qual).forEach(c=>{const v=parseFloat(g[c.key]);if(!isNaN(v)&&g[c.key]!==''&&g[c.key]!==undefined)semArr.push(v);});
   const semAvg=semArr.length?semArr.reduce((a,b)=>a+b,0)/semArr.length:null;
 
-  // ── Exposiciones = 30% ──
+  // ── Exposiciones = 20% ──
   const expArr=[]; COLS_EXP.forEach(c=>{const v=parseFloat(g[c.key]);if(!isNaN(v)&&g[c.key]!==''&&g[c.key]!==undefined)expArr.push(v);});
   const expAvg=expArr.length?expArr.reduce((a,b)=>a+b,0)/expArr.length:null;
 
@@ -1274,10 +1272,8 @@ function wAvg(i, bimData){
   if(semAvg===null&&expAvg===null&&libAvg===null&&!bimArr.length&&cpNum===null) return null;
 
   let totalW=0, totalV=0;
-  if(semAvg!==null){totalV+=semAvg*40; totalW+=40;}
+  if(semAvg!==null){totalV+=semAvg*30; totalW+=30;}
   if(expAvg!==null){totalV+=expAvg*30; totalW+=30;}
-  if(libAvg!==null){totalV+=libAvg*15; totalW+=15;}
-  bimArr.forEach(v=>{totalV+=v*10; totalW+=10;});
   if(cpNum!==null){totalV+=cpNum*5; totalW+=5;}
 
   return totalW?Math.round((totalV/totalW)*10)/10:null;
@@ -2364,12 +2360,10 @@ async function loadDashboard(){
         let p12=null; if(hb1&&hb2)p12=(beb1+beb2)/2; else if(hb1)p12=beb1; else if(hb2)p12=beb2;
         let bimFin=null; if(p12!==null&&hb3)bimFin=(p12+beb3)/2; else if(p12!==null)bimFin=p12; else if(hb3)bimFin=beb3;
         const cpRaw=compD[si]??''; const cpv=parseFloat(cpRaw); const cpNum=(!isNaN(cpv)&&cpRaw!=='')?cpv:null;
-        if(semAvg===null&&expAvg===null&&libAvg===null&&bimFin===null&&cpNum===null)return;
+        if(semAvg===null&&expAvg===null&&cpNum===null)return;
         let tw=0,tv=0;
         if(semAvg!==null){tv+=semAvg*40;tw+=40;}
         if(expAvg!==null){tv+=expAvg*30;tw+=30;}
-        if(libAvg!==null){tv+=libAvg*15;tw+=15;}
-        if(bimFin!==null&&!NO_BIM_COURSES.has(cid)){tv+=bimFin*30;tw+=30;}
         if(cpNum!==null){tv+=cpNum*5;tw+=5;}
         if(!tw)return;
         const avg=Math.round((tv/tw)*10)/10;
@@ -3155,7 +3149,7 @@ async function saveNotes(){
 // ══════════════════════════════════════════
 //  BOLETAS DE NOTAS
 // ══════════════════════════════════════════
-let boletaMode = 'bimestre';   // 'bimestre' | 'anual'
+let boletaMode = 'bimestre';   // solo por bimestre
 let boletaData = {};           // {bimestre: {courseId: {studentIdx: grades}}}
 let boletaBimData = {};        // {bimestre: {studentIdx: bimGrades}}
 let boletaNames = [];
@@ -3201,10 +3195,8 @@ async function renderBoletasView(){
 
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Tipo de boleta:</div>
       <div class="boleta-mode-row">
-        <button class="boleta-mode-btn ${boletaMode==='bimestre'?'active':''}"
+        <button class="boleta-mode-btn active"
           onclick="setBoletaMode('bimestre')">📋 Por bimestre</button>
-        <button class="boleta-mode-btn ${boletaMode==='anual'?'active':''}"
-          onclick="setBoletaMode('anual')">📅 Consolidado anual (4 bimestres)</button>
       </div>
 
       <div class="boleta-btn-row">
@@ -3307,60 +3299,43 @@ async function loadAllBoletaData(){
 }
 
 // Calc weighted avg from boleta data
-// Mismos pesos que wAvg: Sem 40% · Expo 30% · Libro 15% · Bimestral 10% · Comportamiento 5%
 function calcBoletaAvg(studentIdx, bim, courseId){
   const g = boletaData[bim]?.[courseId] || {};
   const bd= boletaBimData[bim] || {};
   const si = studentIdx;
-
-  // Semanales = 40%
-  const semArr=[];
+  let g1sum=0,g1cnt=0;
   COLS_SEM.filter(c=>!c.qual).forEach(c=>{
     const v=parseFloat((g[si]||{})[c.key]);
-    if(!isNaN(v)&&(g[si]||{})[c.key]!=='') semArr.push(v);
+    if(!isNaN(v)&&(g[si]||{})[c.key]!==''){g1sum+=v;g1cnt++;}
   });
-  const semAvg=semArr.length?semArr.reduce((a,b)=>a+b,0)/semArr.length:null;
-
-  // Exposiciones = 30%
-  const expArr=[];
   COLS_EXP.forEach(c=>{
     const v=parseFloat((g[si]||{})[c.key]);
-    if(!isNaN(v)&&(g[si]||{})[c.key]!=='') expArr.push(v);
+    if(!isNaN(v)&&(g[si]||{})[c.key]!==''){g1sum+=v;g1cnt++;}
   });
-  const expAvg=expArr.length?expArr.reduce((a,b)=>a+b,0)/expArr.length:null;
-
-  // Libro (cualitativo) = 15%
-  const libArr=[];
   COLS_QUAL.forEach(c=>{
-    const n=qualToNum((g[si]||{})[c.key]||'');
-    if(n!==null) libArr.push(n);
+    const q=(g[si]||{})[c.key]||'';
+    const n=qualToNum(q); if(n!==null){g1sum+=n;g1cnt++;}
   });
-  const libAvg=libArr.length?libArr.reduce((a,b)=>a+b,0)/libArr.length:null;
-
-  // Evaluaciones Bimestrales = 10%
-  const eb1=parseFloat((bd[si]||{}).eb1); const hasEB1=!isNaN(eb1)&&(bd[si]||{}).eb1!=='';
-  const eb2=parseFloat((bd[si]||{}).eb2); const hasEB2=!isNaN(eb2)&&(bd[si]||{}).eb2!=='';
-  const eb3=parseFloat((bd[si]||{}).eb3); const hasEB3=!isNaN(eb3)&&(bd[si]||{}).eb3!=='';
-  let promEB12=null;
-  if(hasEB1&&hasEB2) promEB12=(eb1+eb2)/2;
-  else if(hasEB1) promEB12=eb1;
-  else if(hasEB2) promEB12=eb2;
-  let bimFinalVal=null;
-  if(promEB12!==null&&hasEB3) bimFinalVal=(promEB12+eb3)/2;
-  else if(promEB12!==null) bimFinalVal=promEB12;
-  else if(hasEB3) bimFinalVal=eb3;
-
-  // Comportamiento = 5%
-  const cpv=parseFloat((g[si]||{}).cp);
-  const cpNum=(!isNaN(cpv)&&(g[si]||{}).cp!=='')?cpv:null;
-
-  if(semAvg===null&&expAvg===null&&libAvg===null&&bimFinalVal===null&&cpNum===null) return null;
+  // Calc separate averages for sem and exp
+  let semSum=0,semCnt=0,expSum=0,expCnt=0;
+  COLS_SEM.filter(c=>!c.qual).forEach(c=>{
+    const v=parseFloat((g[si]||{})[c.key]);
+    if(!isNaN(v)&&(g[si]||{})[c.key]!==''){semSum+=v;semCnt++;}
+  });
+  COLS_EXP.forEach(c=>{
+    const v=parseFloat((g[si]||{})[c.key]);
+    if(!isNaN(v)&&(g[si]||{})[c.key]!==''){expSum+=v;expCnt++;}
+  });
+  const semAvgB=semCnt>0?semSum/semCnt:null;
+  const expAvgB=expCnt>0?expSum/expCnt:null;
+  const cpvB=parseFloat((g[si]||{}).cp);
+  const cpNumB=(!isNaN(cpvB)&&(g[si]||{}).cp!=='')?cpvB:null;
+  // Fórmula: Sem 40% + Expo 30% + Comp 5%
+  if(semAvgB===null&&expAvgB===null&&cpNumB===null) return null;
   let tw=0,tv=0;
-  if(semAvg!==null){tv+=semAvg*40;tw+=40;}
-  if(expAvg!==null){tv+=expAvg*30;tw+=30;}
-  if(libAvg!==null){tv+=libAvg*15;tw+=15;}
-  if(bimFinalVal!==null){tv+=bimFinalVal*10;tw+=10;}
-  if(cpNum!==null){tv+=cpNum*5;tw+=5;}
+  if(semAvgB!==null){tv+=semAvgB*40;tw+=40;}
+  if(expAvgB!==null){tv+=expAvgB*30;tw+=30;}
+  if(cpNumB!==null){tv+=cpNumB*5;tw+=5;}
   return tw?Math.round((tv/tw)*10)/10:null;
 }
 
@@ -3400,7 +3375,7 @@ function renderStudentCards(){
             </div>
             <div>
               <div class="bpc-name">${name}</div>
-              <div class="bpc-info">${prof.dni?'DNI: '+prof.dni+' · ':''} ${boletaMode==='anual'?'Consolidado anual':'Bim. '+bimestre}</div>
+              <div class="bpc-info">${prof.dni?'DNI: '+prof.dni+' · ':''} Bim. ${bimestre}</div>
             </div>
           </div>
           <div class="bpc-scores">${scoreChips}</div>
@@ -3715,11 +3690,11 @@ function printCurrentRegister(){
   const ct={AD:'#0E6E45',A:'#1558A0',B:'#7A5C0A',C:'#9B1B1B'};
 
   // ── Group headers ──
-  const semGrp=`<th colspan="9" style="background:#1A4E9A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">NOTAS SEMANALES (40%)</th>`;
+  const semGrp=`<th colspan="9" style="background:#1A4E9A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">NOTAS SEMANALES (30%)</th>`;
   const libGrp=`<th colspan="9" style="background:#0D5C3A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #3A9A70;text-align:center;">REVISIÓN DE LIBRO (15%) — ✓ Hizo · ✗ No hizo · ◑ A medias</th>`;
-  const expGrp=`<th colspan="3" style="background:#1558A0;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">EXPOSICIONES (30%)</th>`;
+  const expGrp=`<th colspan="3" style="background:#1558A0;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">EXPOSICIONES (20%)</th>`;
   const cpGrp =`<th colspan="1" style="background:#5B2EA0;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #B08AE0;text-align:center;">COMP.</th>`;
-  const bimGrp=`<th colspan="3" style="background:#7A5C0A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #E0B840;text-align:center;">EVAL. BIMESTRAL (10%)</th>`;
+  const bimGrp=`<th colspan="3" style="background:#7A5C0A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #E0B840;text-align:center;">EVAL. BIMESTRAL (10% c/u)</th>`;
   const lgGrp =`<th rowspan="2" style="background:#1A4E9A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;vertical-align:middle;">LOGRO</th>`;
 
   // ── Sub headers ──
@@ -3801,8 +3776,8 @@ function printCurrentRegister(){
         <div style="font-size:10px;color:#6B6258;">Docente: <strong>${currentUser?.nombre||'—'}</strong> &nbsp;·&nbsp; CNB 2026 &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-PE',{year:'numeric',month:'long',day:'numeric'})}</div>
       </div>
       <div style="text-align:right;font-size:9px;color:#A09890;line-height:1.8;">
-        <div>Sem <strong>40%</strong> · Expo <strong>30%</strong></div>
-        <div>Libro <strong>15%</strong> · E.Bim <strong>10%</strong></div>
+        <div>Sem <strong>30%</strong> · Expo <strong>20%</strong></div>
+        <div>Libro <strong>15%</strong> · E.Bim <strong>10% c/u</strong></div>
         <div>Comp. <strong>5%</strong></div>
       </div>
     </div>
@@ -3834,7 +3809,7 @@ function printCurrentRegister(){
     <!-- FOOTER -->
     <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:flex-end;">
       <div style="font-size:9px;color:#A09890;">
-        Fórmula: Semanas 40% + Exposiciones 30% + Libro 15% + Evaluaciones Bimestrales 10% + Comportamiento 5%
+        Fórmula: Semanas 40% + Exposiciones 30% + Comportamiento 5% | Libro y E.Bimestral: referencia
       </div>
       <div style="text-align:center;">
         <div style="height:24px;"></div>
