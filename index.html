@@ -793,13 +793,13 @@ tr:hover td{background:var(--surf3);}
       <span class="sc-p"><span class="sc sc-C">C</span>&nbsp;00–10 En Inicio</span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--accent-l);border:1px solid var(--accent);border-radius:7px;padding:4px 10px;">
         <span style="font-size:10px;font-weight:700;color:var(--accent);">Ponderación:</span>
-        <span style="font-size:10px;color:var(--accent);">Sem <b>30%</b></span>
+        <span style="font-size:10px;color:var(--accent);">Sem <b>40%</b></span>
         <span style="color:var(--border2);">·</span>
-        <span style="font-size:10px;color:var(--accent);">Expo <b>20%</b></span>
+        <span style="font-size:10px;color:var(--accent);">Expo <b>30%</b></span>
         <span style="color:var(--border2);">·</span>
         <span style="font-size:10px;color:var(--accent);">Libro <b>15%</b></span>
         <span style="color:var(--border2);">·</span>
-        <span style="font-size:10px;color:var(--accent);">E.Bimestral <b>10% c/u</b></span>
+        <span style="font-size:10px;color:var(--accent);">E.Bimestral <b>10%</b></span>
         <span style="color:var(--border2);">·</span>
         <span style="font-size:10px;color:var(--accent);">Comportamiento <b>5%</b></span>
       </span>
@@ -1230,16 +1230,16 @@ let dashData = {};
 function qualToNum(q){ return q==='C'?20:q==='M'?10:q==='N'?0:null; }
 
 // ── Promedio ponderado CNB 2026 ──
-// Semanas 30% + Exposiciones 20% + Libro 15% = 65%
-// Eval.Bimestral 10% c/u (3 = 30%) · Comportamiento 5%
+// Semanas 40% + Exposiciones 30% + Libro 15% = 85%
+// Eval.Bimestral 10% (general) · Comportamiento 5%
 function wAvg(i, bimData){
   const g=grades[i]||{};
 
-  // ── Semanas numéricas = 30% ──
+  // ── Semanas numéricas = 40% ──
   const semArr=[]; COLS_SEM.filter(c=>!c.qual).forEach(c=>{const v=parseFloat(g[c.key]);if(!isNaN(v)&&g[c.key]!==''&&g[c.key]!==undefined)semArr.push(v);});
   const semAvg=semArr.length?semArr.reduce((a,b)=>a+b,0)/semArr.length:null;
 
-  // ── Exposiciones = 20% ──
+  // ── Exposiciones = 30% ──
   const expArr=[]; COLS_EXP.forEach(c=>{const v=parseFloat(g[c.key]);if(!isNaN(v)&&g[c.key]!==''&&g[c.key]!==undefined)expArr.push(v);});
   const expAvg=expArr.length?expArr.reduce((a,b)=>a+b,0)/expArr.length:null;
 
@@ -1274,8 +1274,8 @@ function wAvg(i, bimData){
   if(semAvg===null&&expAvg===null&&libAvg===null&&!bimArr.length&&cpNum===null) return null;
 
   let totalW=0, totalV=0;
-  if(semAvg!==null){totalV+=semAvg*30; totalW+=30;}
-  if(expAvg!==null){totalV+=expAvg*20; totalW+=20;}
+  if(semAvg!==null){totalV+=semAvg*40; totalW+=40;}
+  if(expAvg!==null){totalV+=expAvg*30; totalW+=30;}
   if(libAvg!==null){totalV+=libAvg*15; totalW+=15;}
   bimArr.forEach(v=>{totalV+=v*10; totalW+=10;});
   if(cpNum!==null){totalV+=cpNum*5; totalW+=5;}
@@ -2366,8 +2366,8 @@ async function loadDashboard(){
         const cpRaw=compD[si]??''; const cpv=parseFloat(cpRaw); const cpNum=(!isNaN(cpv)&&cpRaw!=='')?cpv:null;
         if(semAvg===null&&expAvg===null&&libAvg===null&&bimFin===null&&cpNum===null)return;
         let tw=0,tv=0;
-        if(semAvg!==null){tv+=semAvg*30;tw+=30;}
-        if(expAvg!==null){tv+=expAvg*20;tw+=20;}
+        if(semAvg!==null){tv+=semAvg*40;tw+=40;}
+        if(expAvg!==null){tv+=expAvg*30;tw+=30;}
         if(libAvg!==null){tv+=libAvg*15;tw+=15;}
         if(bimFin!==null&&!NO_BIM_COURSES.has(cid)){tv+=bimFin*30;tw+=30;}
         if(cpNum!==null){tv+=cpNum*5;tw+=5;}
@@ -2884,9 +2884,36 @@ async function dirReleaseCoursePanel(cid,grado,seccion){
 async function sortAlphabetically(){
   const {grado,seccion,bimestre}=getCtx();
 
-  // 1. Load ALL courses grades for this context first
-  setSyncState('saving','cargando todos los cursos...');
+  setSyncState('saving','guardando antes de ordenar...');
   toast('Ordenando... espera un momento','ok');
+
+  // STEP 0: Force-save current course + names to Supabase BEFORE loading anything
+  // This ensures the new student and their notes are in DB before we reload
+  try{
+    await db.from('registros').delete()
+      .eq('grado',grado).eq('seccion',seccion)
+      .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot');
+    await db.from('registros').insert({
+      grado,seccion,bimestre:'all',curso_id:'_names',
+      estudiante_idx:-1,columna_key:'snapshot',
+      estudiante_nombre:JSON.stringify({names,numStudents}),
+      docente_nombre:currentUser.nombre,
+      updated_at:new Date().toISOString()
+    });
+    await db.from('registros').delete()
+      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+      .eq('curso_id',activeCourse).eq('columna_key','snapshot');
+    await db.from('registros').insert({
+      grado,seccion,bimestre,curso_id:activeCourse,
+      estudiante_idx:-1,columna_key:'snapshot',
+      estudiante_nombre:JSON.stringify(grades),
+      docente_nombre:currentUser.nombre,
+      updated_at:new Date().toISOString()
+    });
+  }catch(e){ toast('Error pre-guardando: '+e.message,'err'); return; }
+
+  // 1. Now load ALL courses grades from Supabase (including what we just saved)
+  setSyncState('saving','cargando todos los cursos...');
 
   const allCourseGrades={};
   try{
@@ -3664,11 +3691,11 @@ function printCurrentRegister(){
   const ct={AD:'#0E6E45',A:'#1558A0',B:'#7A5C0A',C:'#9B1B1B'};
 
   // ── Group headers ──
-  const semGrp=`<th colspan="9" style="background:#1A4E9A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">NOTAS SEMANALES (30%)</th>`;
+  const semGrp=`<th colspan="9" style="background:#1A4E9A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">NOTAS SEMANALES (40%)</th>`;
   const libGrp=`<th colspan="9" style="background:#0D5C3A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #3A9A70;text-align:center;">REVISIÓN DE LIBRO (15%) — ✓ Hizo · ✗ No hizo · ◑ A medias</th>`;
-  const expGrp=`<th colspan="3" style="background:#1558A0;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">EXPOSICIONES (20%)</th>`;
+  const expGrp=`<th colspan="3" style="background:#1558A0;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;">EXPOSICIONES (30%)</th>`;
   const cpGrp =`<th colspan="1" style="background:#5B2EA0;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #B08AE0;text-align:center;">COMP.</th>`;
-  const bimGrp=`<th colspan="3" style="background:#7A5C0A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #E0B840;text-align:center;">EVAL. BIMESTRAL (10% c/u)</th>`;
+  const bimGrp=`<th colspan="3" style="background:#7A5C0A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #E0B840;text-align:center;">EVAL. BIMESTRAL (10%)</th>`;
   const lgGrp =`<th rowspan="2" style="background:#1A4E9A;color:white;padding:4px;font-size:9px;font-weight:800;border:1px solid #5B9FE0;text-align:center;vertical-align:middle;">LOGRO</th>`;
 
   // ── Sub headers ──
@@ -3750,8 +3777,8 @@ function printCurrentRegister(){
         <div style="font-size:10px;color:#6B6258;">Docente: <strong>${currentUser?.nombre||'—'}</strong> &nbsp;·&nbsp; CNB 2026 &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-PE',{year:'numeric',month:'long',day:'numeric'})}</div>
       </div>
       <div style="text-align:right;font-size:9px;color:#A09890;line-height:1.8;">
-        <div>Sem <strong>30%</strong> · Expo <strong>20%</strong></div>
-        <div>Libro <strong>15%</strong> · E.Bim <strong>10% c/u</strong></div>
+        <div>Sem <strong>40%</strong> · Expo <strong>30%</strong></div>
+        <div>Libro <strong>15%</strong> · E.Bim <strong>10%</strong></div>
         <div>Comp. <strong>5%</strong></div>
       </div>
     </div>
@@ -3783,7 +3810,7 @@ function printCurrentRegister(){
     <!-- FOOTER -->
     <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:flex-end;">
       <div style="font-size:9px;color:#A09890;">
-        Fórmula: Semanas 30% + Exposiciones 20% + Libro 15% + Evaluaciones Bimestrales 10% c/u + Comportamiento 5%
+        Fórmula: Semanas 40% + Exposiciones 30% + Libro 15% + Evaluaciones Bimestrales 10% + Comportamiento 5%
       </div>
       <div style="text-align:center;">
         <div style="height:24px;"></div>
