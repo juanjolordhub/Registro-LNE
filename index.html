@@ -1696,7 +1696,7 @@ async function loadGrades(){
   const {grado,seccion,bimestre}=getCtx();
   setSyncState('saving','cargando...');
   document.getElementById('tb-ctx').textContent=
-    `${grado} · Secc. ${seccion} · Bim. ${bimestre} · `+
+    `${grado} · Secc. ${seccion} · ${boletaMode==='anual'?'Consolidado anual':'Bim. '+bimestre} · `+
     (COURSES.find(c=>c.id===activeCourse)?.label||'');
   try{
     // Cargar nombres
@@ -2881,7 +2881,11 @@ async function sortAlphabetically(){
   setSyncState('saving','guardando antes de ordenar...');
   toast('Ordenando... espera un momento','ok');
 
-  // STEP 0: Force-save current course + names to Supabase BEFORE loading anything
+  // STEP 0: Sync numStudents with real array, then pre-save
+  numStudents = Math.max(numStudents, names.filter(n=>n&&n.trim()!=='').length);
+  document.getElementById('sel-nalum').value = numStudents;
+
+  // Force-save current course + names to Supabase BEFORE loading anything
   // This ensures the new student and their notes are in DB before we reload
   try{
     await db.from('registros').delete()
@@ -2904,6 +2908,7 @@ async function sortAlphabetically(){
       docente_nombre:currentUser.nombre,
       updated_at:new Date().toISOString()
     });
+    await new Promise(r=>setTimeout(r,400)); // wait for Supabase to commit
   }catch(e){ toast('Error pre-guardando: '+e.message,'err'); return; }
 
   // 1. Now load ALL courses grades from Supabase (including what we just saved)
@@ -2932,8 +2937,10 @@ async function sortAlphabetically(){
     const {data:pr}=await db.from('configuracion').select('valor').eq('id',profKey).maybeSingle();
     const loadedProfiles=pr?JSON.parse(pr.valor)||[]:[];
 
-    // 2. Build student objects with ALL their data
-    const students=Array.from({length:numStudents},(_,i)=>({
+    // 2. Build student objects — use largest possible count
+    const activeLen = Object.keys(allCourseGrades[activeCourse]||{}).length;
+    const totalSlots = Math.max(numStudents, names.length, activeLen);
+    const students=Array.from({length:totalSlots},(_,i)=>({
       name:    names[i]||'',
       bim:     JSON.parse(JSON.stringify(loadedBim[i]||{})),
       comp:    loadedComp[i]??'',
@@ -3149,8 +3156,9 @@ async function saveNotes(){
 // ══════════════════════════════════════════
 //  BOLETAS DE NOTAS
 // ══════════════════════════════════════════
-let boletaMode = 'bimestre';   // solo por bimestre
+let boletaMode = 'bimestre';   // 'bimestre' | 'anual'
 let boletaData = {};           // {bimestre: {courseId: {studentIdx: grades}}}
+let boletaCompData = {};       // {bimestre: {studentIdx: compGrade}}
 let boletaBimData = {};        // {bimestre: {studentIdx: bimGrades}}
 let boletaNames = [];
 let boletaProfiles = [];
@@ -3195,8 +3203,10 @@ async function renderBoletasView(){
 
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Tipo de boleta:</div>
       <div class="boleta-mode-row">
-        <button class="boleta-mode-btn active"
+        <button class="boleta-mode-btn ${boletaMode==='bimestre'?'active':''}"
           onclick="setBoletaMode('bimestre')">📋 Por bimestre</button>
+        <button class="boleta-mode-btn ${boletaMode==='anual'?'active':''}"
+          onclick="setBoletaMode('anual')">📅 Consolidado anual (4 bimestres)</button>
       </div>
 
       <div class="boleta-btn-row">
@@ -3257,7 +3267,7 @@ function getBoletaCtx(){
 async function loadAllBoletaData(){
   const {grado, seccion} = getBoletaCtx();
   const bimestres = ['I','II','III','IV'];
-  boletaData = {}; boletaBimData = {};
+  boletaData = {}; boletaBimData = {}; boletaCompData = {};
 
   // Load names
   try{
@@ -3285,6 +3295,13 @@ async function loadAllBoletaData(){
         .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
         .eq('curso_id','_bimestral').eq('columna_key','snapshot').maybeSingle();
       boletaBimData[bim]=bm?JSON.parse(bm.estudiante_nombre)||{}:{};
+    }catch(e){}
+    // Comportamiento shared
+    try{
+      const {data:cm}=await db.from('registros').select('estudiante_nombre')
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+        .eq('curso_id','_comportamiento').eq('columna_key','snapshot').maybeSingle();
+      boletaCompData[bim]=cm?JSON.parse(cm.estudiante_nombre)||{}:{};
     }catch(e){}
     // Each course
     for(const course of COURSES){
@@ -3328,8 +3345,11 @@ function calcBoletaAvg(studentIdx, bim, courseId){
   });
   const semAvgB=semCnt>0?semSum/semCnt:null;
   const expAvgB=expCnt>0?expSum/expCnt:null;
-  const cpvB=parseFloat((g[si]||{}).cp);
-  const cpNumB=(!isNaN(cpvB)&&(g[si]||{}).cp!=='')?cpvB:null;
+  // Comportamiento from shared data (not per-course)
+  const compD = boletaCompData[bim]||{};
+  const cpRawB = compD[si]??'';
+  const cpvB=parseFloat(cpRawB);
+  const cpNumB=(!isNaN(cpvB)&&cpRawB!=='')?cpvB:null;
   // Fórmula: Sem 40% + Expo 30% + Comp 5%
   if(semAvgB===null&&expAvgB===null&&cpNumB===null) return null;
   let tw=0,tv=0;
@@ -3375,7 +3395,7 @@ function renderStudentCards(){
             </div>
             <div>
               <div class="bpc-name">${name}</div>
-              <div class="bpc-info">${prof.dni?'DNI: '+prof.dni+' · ':''} Bim. ${bimestre}</div>
+              <div class="bpc-info">${prof.dni?'DNI: '+prof.dni+' · ':''} ${boletaMode==='anual'?'Consolidado anual':'Bim. '+bimestre}</div>
             </div>
           </div>
           <div class="bpc-scores">${scoreChips}</div>
@@ -3432,19 +3452,23 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
 
   // Courses to display (only active visible ones)
   // Only show courses that have at least one note in any bimestre
-  // Only show courses with at least one real numeric note across all bimestres
+  // Only show courses with at least one REAL note (not empty snapshot)
   const displayCourses = COURSES.filter(c=>{
     return ['I','II','III','IV'].some(bim=>{
       const g=boletaData[bim]?.[c.id]||{};
-      // Check if any student has any numeric value in any column
-      return Object.values(g).some(row=>{
+      const entries=Object.values(g);
+      if(!entries.length) return false;
+      return entries.some(row=>{
         if(!row||typeof row!=='object') return false;
-        return COLS_NUM.some(col=>{
-          const v=(row||{})[col.key];
-          if(v===''||v===undefined||v===null) return false;
-          const n=parseFloat(v);
-          return !isNaN(n); // must be a real number
-        });
+        for(let si=1;si<=9;si++){
+          const v=parseFloat(row['s'+si]);
+          if(!isNaN(v)&&row['s'+si]!==''&&row['s'+si]!==undefined) return true;
+        }
+        for(const ek of ['ex1','ex2','ex3']){
+          const v=parseFloat(row[ek]);
+          if(!isNaN(v)&&row[ek]!==''&&row[ek]!==undefined) return true;
+        }
+        return false;
       });
     });
   });
