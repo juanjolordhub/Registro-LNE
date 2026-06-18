@@ -1580,6 +1580,7 @@ function onAlumChange(){
 // ══════════════════════════════════════════
 // Course assignment system
 let courseOwnerName = null;   // docente assigned to current course
+let bimestreLocked = false;   // true if current grado/seccion/bimestre is locked
 let courseAssignments = {};   // {courseId: docenteName} for current context
 
 // visible courses per user (loaded from supabase configuracion)
@@ -1743,6 +1744,13 @@ async function loadGrades(){
       .maybeSingle();
     compGrades=cm?JSON.parse(cm.estudiante_nombre)||{}:{};
 
+    // Cargar estado de bloqueo del bimestre
+    try{
+      const lockKey=`lock_${grado}_${seccion}_${bimestre}`;
+      const {data:lk}=await db.from('configuracion').select('valor').eq('id',lockKey).maybeSingle();
+      bimestreLocked = lk ? lk.valor==='true' : false;
+    }catch(e){ bimestreLocked=false; }
+
     // Cargar perfiles de estudiantes
     const profKey=`profiles_${grado}_${seccion}`;
     const {data:pr}=await db.from('configuracion').select('valor').eq('id',profKey).maybeSingle();
@@ -1773,6 +1781,8 @@ function scheduleSave(){
   const isOwner=owner===currentUser?.nombre;
   const isFree=!owner;
   if(!isDir&&!isAux&&!isOwner&&!isFree)return;
+  // BLOQUEO: si está bloqueado y no es director, no guarda
+  if(bimestreLocked && !isDir){ toast('🔒 Este bimestre está bloqueado','warn'); return; }
   clearTimeout(saveTimer);
   setSyncState('saving','guardando...');
   showSaveBar('saving');
@@ -1860,12 +1870,32 @@ function renderTable(){
   const dlRow=document.getElementById('dl-row-teacher');
   const oldBanner=document.getElementById('assign-banner');
   if(oldBanner)oldBanner.remove();
+  const oldLockBanner=document.getElementById('lock-banner');
+  if(oldLockBanner)oldLockBanner.remove();
 
   const isDir=currentUser.rol==='director';
   const isAuxiliar=currentUser.rol==='auxiliar';
   const myName=currentUser.nombre;
   const owner=courseOwnerName;
   const courseName=COURSES.find(c=>c.id===activeCourse)?.label||'';
+
+  // Lock banner — always show, director can toggle
+  let lockBannerHtml='';
+  if(bimestreLocked){
+    lockBannerHtml=`<div id="lock-banner" style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #FCA5A5;border-radius:9px;font-size:12px;font-weight:700;color:#991B1B;margin-bottom:10px;">
+      🔒 Bimestre ${bimestre} <strong>BLOQUEADO</strong> — No se pueden hacer cambios.
+      ${isDir?`<button onclick="toggleBimestreLock()" style="margin-left:auto;padding:5px 14px;background:white;border:1.5px solid #991B1B;border-radius:7px;font-size:11px;font-weight:700;color:#991B1B;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔓 Desbloquear</button>`:''}
+    </div>`;
+  } else if(isDir){
+    lockBannerHtml=`<div id="lock-banner" style="display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surf2);border:1.5px solid var(--border);border-radius:9px;font-size:11px;color:var(--text2);margin-bottom:10px;">
+      🔓 Bimestre ${bimestre} abierto para edición.
+      <button onclick="toggleBimestreLock()" style="margin-left:auto;padding:5px 14px;background:var(--surf);border:1.5px solid var(--border2);border-radius:7px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔒 Bloquear bimestre</button>
+    </div>`;
+  }
+  if(saveWrap && lockBannerHtml){
+    const lb=document.createElement('div'); lb.innerHTML=lockBannerHtml;
+    saveWrap.after(lb.firstChild);
+  }
 
   let bannerHtml=''; let canEdit=true;
   if(isDir){
@@ -1878,6 +1908,11 @@ function renderTable(){
     if(!owner){ bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-free">Curso sin docente asignado. <button class="btn-claim btn-claim-take" onclick="claimCourse('${activeCourse}')" style="margin-left:auto;">✋ Tomar este curso</button></div>`; canEdit=true; if(dlRow)dlRow.style.display='none'; }
     else if(owner===myName){ bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-mine">✓ Tu curso: <strong style="margin:0 4px;">${courseName}</strong><button class="btn-claim btn-claim-release" onclick="releaseCourse('${activeCourse}')" style="margin-left:auto;">Liberar</button></div>`; canEdit=true; if(dlRow)dlRow.style.display='flex'; }
     else { bannerHtml=`<div id="assign-banner" class="course-assign-banner cab-other">⚠️ Asignado a: <strong style="margin:0 5px;">${owner}</strong> — Solo lectura</div>`; canEdit=false; if(dlRow)dlRow.style.display='none'; }
+  }
+
+  // BLOQUEO: si el bimestre está bloqueado, nadie excepto Director puede editar
+  if(bimestreLocked && !isDir){
+    canEdit=false;
   }
   if(bannerHtml){ const d=document.createElement('div'); d.innerHTML=bannerHtml; saveWrap.after(d.firstChild); }
 
@@ -1955,7 +1990,7 @@ function renderTable(){
 
     // Comportamiento — compartido, solo Director edita
     const cpv=(compGrades[i]??''); const cpl=toLetter(cpv);
-    const cpEditable=isDir||isAuxiliar;
+    const cpEditable=(isDir||isAuxiliar) && !(bimestreLocked && !isDir);
     const compCell=`<td style="text-align:center;padding:3px 2px;border-right:2px solid var(--border2);">
       <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
         <input type="number" min="0" max="20" step="0.1" class="si-dec t-cp ${cpl?'v'+cpl:''}"
@@ -1971,7 +2006,7 @@ function renderTable(){
     // Director/auxiliar can always edit bimestral
     // For initial grades (3,4,5 Añitos): the assigned docente can also edit
     const isInicial = ['3 Añitos','4 Añitos','5 Añitos'].includes(grado);
-    const canEditBim = isDir || isAuxiliar || (isInicial && owner===currentUser.nombre) || (isInicial && !owner);
+    const canEditBim = (isDir || isAuxiliar || (isInicial && owner===currentUser.nombre) || (isInicial && !owner)) && !(bimestreLocked && !isDir);
     const bimCells=NO_BIM_COURSES.has(activeCourse)?'':COLS_BIM.map((col,bi)=>{
       const v=(bimGrades[i]||{})[col.key]??''; const lv=toLetter(v);
       const bimRattr=canEditBim?'':'readonly style="pointer-events:none;background:var(--surf2)!important;color:var(--text3)!important;border-style:dashed;"';
@@ -2056,6 +2091,7 @@ function onScore(el){
 }
 
 function onScoreComp(el){
+  if(bimestreLocked && currentUser.rol!=='director'){ toast('🔒 Bimestre bloqueado','warn'); return; }
   const i=parseInt(el.dataset.i);
   let v=el.value.trim();
   if(v!==''){
@@ -2074,6 +2110,7 @@ function onScoreComp(el){
 }
 
 function onScoreBim(el){
+  if(bimestreLocked && currentUser.rol!=='director'){ toast('🔒 Bimestre bloqueado','warn'); return; }
   const i=parseInt(el.dataset.i), k=el.dataset.k;
   let v=el.value.trim();
   if(v!==''){
@@ -2095,6 +2132,7 @@ function onScoreBim(el){
 }
 
 function cycleQual(btn,i,k){
+  if(bimestreLocked && currentUser.rol!=='director'){ toast('🔒 Bimestre bloqueado','warn'); return; }
   const cur=(grades[i]||{})[k]||'';
   const idx=QUAL_VALS.indexOf(cur);
   const next=QUAL_VALS[(idx+1)%QUAL_VALS.length];
@@ -2876,17 +2914,16 @@ async function dirReleaseCoursePanel(cid,grado,seccion){
 //  ORDENAR ALFABÉTICAMENTE
 // ══════════════════════════════════════════
 async function sortAlphabetically(){
-  const {grado,seccion,bimestre}=getCtx();
+  const {grado,seccion,bimestre:curBim}=getCtx();
+  const ALL_BIMS=['I','II','III','IV'];
 
   setSyncState('saving','guardando antes de ordenar...');
-  toast('Ordenando... espera un momento','ok');
+  toast('Ordenando los 4 bimestres... espera un momento','ok');
 
-  // STEP 0: Sync numStudents with real array, then pre-save
+  // STEP 0: Sync numStudents + pre-save current course+bimestre (the one being edited right now)
   numStudents = Math.max(numStudents, names.filter(n=>n&&n.trim()!=='').length);
   document.getElementById('sel-nalum').value = numStudents;
 
-  // Force-save current course + names to Supabase BEFORE loading anything
-  // This ensures the new student and their notes are in DB before we reload
   try{
     await db.from('registros').delete()
       .eq('grado',grado).eq('seccion',seccion)
@@ -2899,84 +2936,107 @@ async function sortAlphabetically(){
       updated_at:new Date().toISOString()
     });
     await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',curBim)
       .eq('curso_id',activeCourse).eq('columna_key','snapshot');
     await db.from('registros').insert({
-      grado,seccion,bimestre,curso_id:activeCourse,
+      grado,seccion,bimestre:curBim,curso_id:activeCourse,
       estudiante_idx:-1,columna_key:'snapshot',
       estudiante_nombre:JSON.stringify(grades),
       docente_nombre:currentUser.nombre,
       updated_at:new Date().toISOString()
     });
-    await new Promise(r=>setTimeout(r,400)); // wait for Supabase to commit
+    await new Promise(r=>setTimeout(r,400));
   }catch(e){ toast('Error pre-guardando: '+e.message,'err'); return; }
 
-  // 1. Now load ALL courses grades from Supabase (including what we just saved)
-  setSyncState('saving','cargando todos los cursos...');
+  // STEP 1: Load EVERYTHING for ALL 4 bimestres — courses, bimestral, comportamiento, locks
+  setSyncState('saving','cargando los 4 bimestres...');
 
-  const allCourseGrades={};
+  const dataByBim={}; // dataByBim[bim] = {courses:{cid:{idx:row}}, bim:{}, comp:{}, locked:bool}
+  let profilesData=[];
+
   try{
-    for(const course of COURSES){
-      const {data:gr}=await db.from('registros').select('estudiante_nombre')
-        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-        .eq('curso_id',course.id).eq('columna_key','snapshot').maybeSingle();
-      allCourseGrades[course.id]=gr?JSON.parse(gr.estudiante_nombre)||{}:{};
-    }
-    // Also load bimestral, comp, profiles
-    const {data:bm}=await db.from('registros').select('estudiante_nombre')
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-      .eq('curso_id','_bimestral').eq('columna_key','snapshot').maybeSingle();
-    const loadedBim=bm?JSON.parse(bm.estudiante_nombre)||{}:{};
+    for(const bim of ALL_BIMS){
+      dataByBim[bim]={courses:{},bim:{},comp:{},locked:false};
 
-    const {data:cm}=await db.from('registros').select('estudiante_nombre')
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-      .eq('curso_id','_comportamiento').eq('columna_key','snapshot').maybeSingle();
-    const loadedComp=cm?JSON.parse(cm.estudiante_nombre)||{}:{};
+      for(const course of COURSES){
+        const {data:gr}=await db.from('registros').select('estudiante_nombre')
+          .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+          .eq('curso_id',course.id).eq('columna_key','snapshot').maybeSingle();
+        dataByBim[bim].courses[course.id]=gr?JSON.parse(gr.estudiante_nombre)||{}:{};
+      }
+
+      const {data:bm}=await db.from('registros').select('estudiante_nombre')
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+        .eq('curso_id','_bimestral').eq('columna_key','snapshot').maybeSingle();
+      dataByBim[bim].bim = bm?JSON.parse(bm.estudiante_nombre)||{}:{};
+
+      const {data:cm}=await db.from('registros').select('estudiante_nombre')
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+        .eq('curso_id','_comportamiento').eq('columna_key','snapshot').maybeSingle();
+      dataByBim[bim].comp = cm?JSON.parse(cm.estudiante_nombre)||{}:{};
+
+      // Check lock status (informational only — reordering positions is always allowed)
+      const {data:lk}=await db.from('configuracion').select('valor').eq('id',`lock_${grado}_${seccion}_${bim}`).maybeSingle();
+      dataByBim[bim].locked = lk ? lk.valor==='true' : false;
+    }
 
     const profKey=`profiles_${grado}_${seccion}`;
     const {data:pr}=await db.from('configuracion').select('valor').eq('id',profKey).maybeSingle();
-    const loadedProfiles=pr?JSON.parse(pr.valor)||[]:[];
+    profilesData=pr?JSON.parse(pr.valor)||[]:[];
 
-    // 2. Build student objects — use largest possible count
-    const activeLen = Object.keys(allCourseGrades[activeCourse]||{}).length;
-    const totalSlots = Math.max(numStudents, names.length, activeLen);
-    const students=Array.from({length:totalSlots},(_,i)=>({
-      name:    names[i]||'',
-      bim:     JSON.parse(JSON.stringify(loadedBim[i]||{})),
-      comp:    loadedComp[i]??'',
-      profile: JSON.parse(JSON.stringify(loadedProfiles[i]||{})),
-      courses: {},
-    }));
-    COURSES.forEach(c=>{
-      students.forEach((s,i)=>{ s.courses[c.id]=JSON.parse(JSON.stringify(allCourseGrades[c.id][i]||{})); });
+  }catch(e){ toast('Error cargando datos: '+e.message,'err'); setSyncState('error','error'); return; }
+
+  // STEP 2: Build complete student objects with data from ALL 4 bimestres
+  const activeLen = Object.keys(dataByBim[curBim].courses[activeCourse]||{}).length;
+  const totalSlots = Math.max(numStudents, names.length, activeLen);
+
+  const students = Array.from({length:totalSlots},(_,i)=>{
+    const s = { name: names[i]||'', profile: JSON.parse(JSON.stringify(profilesData[i]||{})), perBim:{} };
+    ALL_BIMS.forEach(bim=>{
+      s.perBim[bim] = {
+        bim:  JSON.parse(JSON.stringify(dataByBim[bim].bim[i]||{})),
+        comp: dataByBim[bim].comp[i] ?? '',
+        courses: {}
+      };
+      COURSES.forEach(c=>{ s.perBim[bim].courses[c.id]=JSON.parse(JSON.stringify(dataByBim[bim].courses[c.id][i]||{})); });
     });
+    return s;
+  });
 
-    // 3. Sort: named students A-Z, unnamed go to bottom
-    const named   = students.filter(s=>s.name.trim()!=='');
-    const unnamed = students.filter(s=>s.name.trim()==='');
-    named.sort((a,b)=>a.name.trim().localeCompare(b.name.trim(),'es',{sensitivity:'base'}));
-    const sorted=[...named,...unnamed];
+  // STEP 3: Sort A-Z (named first, blanks at bottom) — this defines the NEW global order
+  const named   = students.filter(s=>s.name.trim()!=='');
+  const unnamed = students.filter(s=>s.name.trim()==='');
+  named.sort((a,b)=>a.name.trim().localeCompare(b.name.trim(),'es',{sensitivity:'base'}));
+  const sorted = [...named, ...unnamed];
 
-    // 4. Rebuild all arrays with new order
-    names=[]; grades={}; bimGrades={}; compGrades={}; studentProfiles=[];
-    const newCourseGrades={};
-    COURSES.forEach(c=>{ newCourseGrades[c.id]={}; });
+  // STEP 4: Rebuild arrays for ALL 4 bimestres with the new order
+  const newNames=[]; const newProfiles=[];
+  const newPerBim={}; ALL_BIMS.forEach(bim=>{ newPerBim[bim]={courses:{},bim:{},comp:{}}; COURSES.forEach(c=>{newPerBim[bim].courses[c.id]={};}); });
 
-    sorted.forEach((s,newIdx)=>{
-      names[newIdx]    = s.name;
-      bimGrades[newIdx]= s.bim;
-      compGrades[newIdx]= s.comp;
-      studentProfiles[newIdx]=s.profile;
-      COURSES.forEach(c=>{ newCourseGrades[c.id][newIdx]=s.courses[c.id]; });
+  sorted.forEach((s,newIdx)=>{
+    newNames[newIdx]=s.name;
+    newProfiles[newIdx]=s.profile;
+    ALL_BIMS.forEach(bim=>{
+      newPerBim[bim].bim[newIdx]=s.perBim[bim].bim;
+      newPerBim[bim].comp[newIdx]=s.perBim[bim].comp;
+      COURSES.forEach(c=>{ newPerBim[bim].courses[c.id][newIdx]=s.perBim[bim].courses[c.id]; });
     });
-    grades=newCourseGrades[activeCourse]||{};
-    numStudents=Math.max(named.length,1);
-    document.getElementById('sel-nalum').value=numStudents;
+  });
 
-    // 5. Save EVERYTHING to Supabase
-    setSyncState('saving','guardando orden en todos los cursos...');
+  const newNumStudents=Math.max(named.length,1);
 
-    // Save names
+  // Update in-memory state for the CURRENT view
+  names=newNames;
+  numStudents=newNumStudents;
+  document.getElementById('sel-nalum').value=numStudents;
+  grades=newPerBim[curBim].courses[activeCourse]||{};
+  bimGrades=newPerBim[curBim].bim;
+  compGrades=newPerBim[curBim].comp;
+  studentProfiles=newProfiles;
+
+  // STEP 5: Save EVERYTHING — names once, then all 4 bimestres × all courses + bim + comp
+  setSyncState('saving','guardando los 4 bimestres...');
+  try{
     await db.from('registros').delete()
       .eq('grado',grado).eq('seccion',seccion)
       .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot');
@@ -2988,122 +3048,61 @@ async function sortAlphabetically(){
       updated_at:new Date().toISOString()
     });
 
-    // Save all courses
-    for(const course of COURSES){
+    for(const bim of ALL_BIMS){
+      for(const course of COURSES){
+        await db.from('registros').delete()
+          .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+          .eq('curso_id',course.id).eq('columna_key','snapshot');
+        await db.from('registros').insert({
+          grado,seccion,bimestre:bim,curso_id:course.id,
+          estudiante_idx:-1,columna_key:'snapshot',
+          estudiante_nombre:JSON.stringify(newPerBim[bim].courses[course.id]),
+          docente_nombre:currentUser.nombre,
+          updated_at:new Date().toISOString()
+        });
+      }
       await db.from('registros').delete()
-        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-        .eq('curso_id',course.id).eq('columna_key','snapshot');
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+        .eq('curso_id','_bimestral').eq('columna_key','snapshot');
       await db.from('registros').insert({
-        grado,seccion,bimestre,curso_id:course.id,
+        grado,seccion,bimestre:bim,curso_id:'_bimestral',
         estudiante_idx:-1,columna_key:'snapshot',
-        estudiante_nombre:JSON.stringify(newCourseGrades[course.id]),
+        estudiante_nombre:JSON.stringify(newPerBim[bim].bim),
+        docente_nombre:currentUser.nombre,
+        updated_at:new Date().toISOString()
+      });
+      await db.from('registros').delete()
+        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
+        .eq('curso_id','_comportamiento').eq('columna_key','snapshot');
+      await db.from('registros').insert({
+        grado,seccion,bimestre:bim,curso_id:'_comportamiento',
+        estudiante_idx:-1,columna_key:'snapshot',
+        estudiante_nombre:JSON.stringify(newPerBim[bim].comp),
         docente_nombre:currentUser.nombre,
         updated_at:new Date().toISOString()
       });
     }
 
-    // Save bimestral
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-      .eq('curso_id','_bimestral').eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre,curso_id:'_bimestral',
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify(bimGrades),
-      docente_nombre:currentUser.nombre,
-      updated_at:new Date().toISOString()
-    });
-
-    // Save comp
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-      .eq('curso_id','_comportamiento').eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre,curso_id:'_comportamiento',
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify(compGrades),
-      docente_nombre:currentUser.nombre,
-      updated_at:new Date().toISOString()
-    });
-
-    // Save profiles
     await db.from('configuracion').upsert({
-      id:profKey,valor:JSON.stringify(studentProfiles),
+      id:profKey, valor:JSON.stringify(newProfiles),
       updated_at:new Date().toISOString()
     });
 
     setSyncState('ok','orden guardado ✓');
-    toast('✓ Lista ordenada A–Z en TODOS los cursos','ok');
+    const lockedBims=ALL_BIMS.filter(b=>dataByBim[b].locked);
+    toast(`✓ Orden A–Z aplicado a los 4 bimestres${lockedBims.length?' (incluye bloqueados: '+lockedBims.join(', ')+', solo se movió posición, no valores)':''}`,'ok');
     renderTable();
     renderStats();
 
   }catch(e){
     setSyncState('error','error');
-    toast('Error al ordenar: '+e.message,'err');
+    toast('Error al guardar orden: '+e.message,'err');
   }
 }
 
 
 async function removeBlankRows(){
-  const filled = Array.from({length:numStudents},(_,i)=>i).filter(i=>names[i]&&names[i].trim()!=='');
-  if(filled.length===numStudents){ toast('No hay filas vacías','ok'); return; }
-  const removed = numStudents - filled.length;
-  if(!confirm(`¿Eliminar ${removed} fila(s) vacía(s)? Las notas de esas filas también se eliminarán.`)) return;
-
-  // Rebuild arrays keeping only filled rows — same remapping logic as sort
-  const newNames=[]; const newGrades={}; const newBim={}; const newComp={}; const newProfiles=[];
-  filled.forEach((oldIdx,newIdx)=>{
-    newNames[newIdx]    = names[oldIdx];
-    newGrades[newIdx]   = JSON.parse(JSON.stringify(grades[oldIdx]||{}));
-    newBim[newIdx]      = JSON.parse(JSON.stringify(bimGrades[oldIdx]||{}));
-    newComp[newIdx]     = compGrades[oldIdx]??'';
-    newProfiles[newIdx] = JSON.parse(JSON.stringify(studentProfiles[oldIdx]||{}));
-  });
-  names           = newNames;
-  grades          = newGrades;
-  bimGrades       = newBim;
-  compGrades      = newComp;
-  studentProfiles = newProfiles;
-  numStudents     = filled.length;
-  document.getElementById('sel-nalum').value = numStudents;
-
-  // Save everything
-  const {grado,seccion,bimestre}=getCtx();
-  setSyncState('saving','eliminando filas...');
-  try{
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion)
-      .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre:'all',curso_id:'_names',
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify({names,numStudents}),
-      docente_nombre:currentUser.nombre, updated_at:new Date().toISOString()
-    });
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-      .eq('curso_id',activeCourse).eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre,curso_id:activeCourse,
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify(grades),
-      docente_nombre:currentUser.nombre, updated_at:new Date().toISOString()
-    });
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
-      .eq('curso_id','_bimestral').eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre,curso_id:'_bimestral',
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify(bimGrades),
-      docente_nombre:currentUser.nombre, updated_at:new Date().toISOString()
-    });
-    const profKey=`profiles_${grado}_${seccion}`;
-    await db.from('configuracion').upsert({id:profKey,valor:JSON.stringify(studentProfiles),updated_at:new Date().toISOString()});
-    setSyncState('ok','guardado ✓');
-    toast(`✓ ${removed} fila(s) vacía(s) eliminada(s)`,'ok');
-    renderTable();
-  }catch(e){ setSyncState('error','error'); toast('Error: '+e.message,'err'); }
+  toast('⚠️ Usa el botón "Orden A–Z" en su lugar — ahora también elimina filas vacías y mantiene sincronizados los 4 bimestres automáticamente.','warn');
 }
 
 // ══════════════════════════════════════════
@@ -4224,6 +4223,28 @@ async function applyActToComportamiento(){
     }
     toast(`✓ Comportamiento actualizado para ${Object.keys(newCompGrades).length} estudiantes`,'ok');
     loadActSummary();
+  }catch(e){ toast('Error: '+e.message,'err'); }
+}
+
+
+// ══════════════════════════════════════════
+//  BLOQUEO DE BIMESTRE (Solo Director)
+// ══════════════════════════════════════════
+async function toggleBimestreLock(){
+  const {grado,seccion,bimestre}=getCtx();
+  const newState = !bimestreLocked;
+  const action = newState ? 'bloquear' : 'desbloquear';
+  if(!confirm(`¿Seguro que quieres ${action} el Bimestre ${bimestre} de ${grado} Sección ${seccion}?\n\n${newState?'Los docentes ya NO podrán editar ninguna nota de este bimestre.':'Los docentes podrán volver a editar las notas.'}`)) return;
+
+  const lockKey=`lock_${grado}_${seccion}_${bimestre}`;
+  try{
+    await db.from('configuracion').upsert({
+      id:lockKey, valor:String(newState),
+      updated_at:new Date().toISOString()
+    });
+    bimestreLocked=newState;
+    toast(newState?`🔒 Bimestre ${bimestre} bloqueado`:`🔓 Bimestre ${bimestre} desbloqueado`,'ok');
+    renderTable();
   }catch(e){ toast('Error: '+e.message,'err'); }
 }
 
