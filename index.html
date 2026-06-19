@@ -1581,6 +1581,7 @@ function onAlumChange(){
 // Course assignment system
 let courseOwnerName = null;   // docente assigned to current course
 let bimestreLocked = false;   // true if current grado/seccion/bimestre is locked
+let bimestreLockedGlobal = false; // true if THIS bimestre is locked institution-wide
 let courseAssignments = {};   // {courseId: docenteName} for current context
 
 // visible courses per user (loaded from supabase configuracion)
@@ -1744,12 +1745,17 @@ async function loadGrades(){
       .maybeSingle();
     compGrades=cm?JSON.parse(cm.estudiante_nombre)||{}:{};
 
-    // Cargar estado de bloqueo del bimestre
+    // Cargar estado de bloqueo (global del bimestre + específico de este grado/sección)
     try{
+      const {data:lkG}=await db.from('configuracion').select('valor').eq('id',`lock_GLOBAL_${bimestre}`).maybeSingle();
+      bimestreLockedGlobal = lkG ? lkG.valor==='true' : false;
+
       const lockKey=`lock_${grado}_${seccion}_${bimestre}`;
       const {data:lk}=await db.from('configuracion').select('valor').eq('id',lockKey).maybeSingle();
-      bimestreLocked = lk ? lk.valor==='true' : false;
-    }catch(e){ bimestreLocked=false; }
+      const specificLock = lk ? lk.valor==='true' : false;
+
+      bimestreLocked = bimestreLockedGlobal || specificLock;
+    }catch(e){ bimestreLocked=false; bimestreLockedGlobal=false; }
 
     // Cargar perfiles de estudiantes
     const profKey=`profiles_${grado}_${seccion}`;
@@ -1879,17 +1885,26 @@ function renderTable(){
   const owner=courseOwnerName;
   const courseName=COURSES.find(c=>c.id===activeCourse)?.label||'';
 
-  // Lock banner — always show, director can toggle
+  // Lock banner — always show, director can toggle (specific + global)
   let lockBannerHtml='';
-  if(bimestreLocked){
+  if(bimestreLockedGlobal){
+    // Global lock active — specific toggle is irrelevant, only global matters
     lockBannerHtml=`<div id="lock-banner" style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #FCA5A5;border-radius:9px;font-size:12px;font-weight:700;color:#991B1B;margin-bottom:10px;">
-      🔒 Bimestre ${bimestre} <strong>BLOQUEADO</strong> — No se pueden hacer cambios.
-      ${isDir?`<button onclick="toggleBimestreLock()" style="margin-left:auto;padding:5px 14px;background:white;border:1.5px solid #991B1B;border-radius:7px;font-size:11px;font-weight:700;color:#991B1B;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔓 Desbloquear</button>`:''}
+      🔒🌐 Bimestre ${bimestre} <strong>BLOQUEADO EN TODA LA INSTITUCIÓN</strong> — No se pueden hacer cambios.
+      ${isDir?`<button onclick="toggleBimestreLockGlobal()" style="margin-left:auto;padding:5px 14px;background:white;border:1.5px solid #991B1B;border-radius:7px;font-size:11px;font-weight:700;color:#991B1B;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔓 Desbloquear TODO</button>`:''}
+    </div>`;
+  } else if(bimestreLocked){
+    lockBannerHtml=`<div id="lock-banner" style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #FCA5A5;border-radius:9px;font-size:12px;font-weight:700;color:#991B1B;margin-bottom:10px;">
+      🔒 Bimestre ${bimestre} <strong>BLOQUEADO</strong> para ${grado} Secc. ${seccion} — No se pueden hacer cambios.
+      ${isDir?`<button onclick="toggleBimestreLock()" style="margin-left:auto;padding:5px 14px;background:white;border:1.5px solid #991B1B;border-radius:7px;font-size:11px;font-weight:700;color:#991B1B;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔓 Desbloquear esta aula</button>`:''}
     </div>`;
   } else if(isDir){
-    lockBannerHtml=`<div id="lock-banner" style="display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surf2);border:1.5px solid var(--border);border-radius:9px;font-size:11px;color:var(--text2);margin-bottom:10px;">
+    lockBannerHtml=`<div id="lock-banner" style="display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surf2);border:1.5px solid var(--border);border-radius:9px;font-size:11px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;">
       🔓 Bimestre ${bimestre} abierto para edición.
-      <button onclick="toggleBimestreLock()" style="margin-left:auto;padding:5px 14px;background:var(--surf);border:1.5px solid var(--border2);border-radius:7px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔒 Bloquear bimestre</button>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button onclick="toggleBimestreLock()" style="padding:5px 14px;background:var(--surf);border:1.5px solid var(--border2);border-radius:7px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔒 Bloquear solo esta aula</button>
+        <button onclick="toggleBimestreLockGlobal()" style="padding:5px 14px;background:#FEE2E2;border:1.5px solid #FCA5A5;border-radius:7px;font-size:11px;font-weight:800;color:#991B1B;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">🔒🌐 Bloquear TODA la institución</button>
+      </div>
     </div>`;
   }
   if(saveWrap && lockBannerHtml){
@@ -4242,8 +4257,33 @@ async function toggleBimestreLock(){
       id:lockKey, valor:String(newState),
       updated_at:new Date().toISOString()
     });
-    bimestreLocked=newState;
-    toast(newState?`🔒 Bimestre ${bimestre} bloqueado`:`🔓 Bimestre ${bimestre} desbloqueado`,'ok');
+    bimestreLocked = newState || bimestreLockedGlobal;
+    toast(newState?`🔒 Bimestre ${bimestre} bloqueado para ${grado} Secc. ${seccion}`:`🔓 Bimestre ${bimestre} desbloqueado para ${grado} Secc. ${seccion}`,'ok');
+    renderTable();
+  }catch(e){ toast('Error: '+e.message,'err'); }
+}
+
+// ══════════════════════════════════════════
+//  BLOQUEO GLOBAL — TODA LA INSTITUCIÓN
+// ══════════════════════════════════════════
+const ALL_GRADOS=['3 Añitos','4 Añitos','5 Añitos','1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta'];
+const ALL_SECCIONES=['A','B','C','D','E','Única'];
+
+async function toggleBimestreLockGlobal(){
+  const {bimestre}=getCtx();
+  const newState = !bimestreLockedGlobal;
+  const action = newState ? 'BLOQUEAR' : 'DESBLOQUEAR';
+
+  if(!confirm(`⚠️ ${action} el Bimestre ${bimestre} para TODA LA INSTITUCIÓN (todos los grados y secciones)?\n\n${newState?'Ningún docente podrá editar notas de este bimestre en ningún grado.':'Todos los docentes podrán volver a editar este bimestre, salvo los grados/secciones bloqueados individualmente.'}\n\nEsta acción afecta a TODOS los grados de una sola vez.`)) return;
+
+  try{
+    await db.from('configuracion').upsert({
+      id:`lock_GLOBAL_${bimestre}`, valor:String(newState),
+      updated_at:new Date().toISOString()
+    });
+    bimestreLockedGlobal=newState;
+    bimestreLocked = bimestreLockedGlobal || bimestreLocked;
+    toast(newState?`🔒🌐 Bimestre ${bimestre} BLOQUEADO en toda la institución`:`🔓🌐 Bimestre ${bimestre} desbloqueado globalmente`,'ok');
     renderTable();
   }catch(e){ toast('Error: '+e.message,'err'); }
 }
