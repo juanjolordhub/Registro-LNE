@@ -838,15 +838,7 @@ tr:hover td{background:var(--surf3);}
       </div>
       <div class="cf" style="justify-content:flex-end;">
         <label>&nbsp;</label>
-        <button onclick="sortAlphabetically()" style="padding:6px 14px;background:var(--surf);border:1.5px solid var(--border2);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text2);display:flex;align-items:center;gap:5px;"
-          title="Ordenar lista de alumnos de A a Z">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
-          Orden A–Z
-        </button>
-        <button onclick="removeBlankRows()" style="padding:6px 14px;background:var(--c-bg);border:1.5px solid var(--c-br);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:var(--c);display:flex;align-items:center;gap:5px;"
-          title="Eliminar filas vacías (estudiantes retirados)">
-          ✕ Eliminar filas vacías
-        </button>
+  
       </div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -1213,6 +1205,7 @@ let activeCourse = 'mat';
 let grades = {};       // grades[studentIdx][colKey] — per course
 let bimGrades = {};    // bimGrades[studentIdx][ebKey] — shared across courses
 let compGrades = {};   // compGrades[studentIdx] — comportamiento, shared, director only
+let logroOverrides = {};  // logroOverrides[studentIdx] = manual final grade (director only)
 let studentProfiles = []; // [{name,dni,guardian,phone,photoB64}]
 let names = [];
 let numStudents = 28;
@@ -1764,6 +1757,14 @@ async function loadGrades(){
 
     await loadCourseAssignments();
     courseOwnerName=courseAssignments[activeCourse]||null;
+
+    // Cargar logros manuales
+    try{
+      const logroKey=`logro_${grado}_${seccion}_${bimestre}_${activeCourse}`;
+      const {data:lo}=await db.from('configuracion').select('valor').eq('id',logroKey).maybeSingle();
+      logroOverrides=lo?JSON.parse(lo.valor)||{}:{};
+    }catch(e){ logroOverrides={}; }
+
     setSyncState('ok','sincronizado');
   }catch(e){
     setSyncState('error','error de red');
@@ -2035,10 +2036,10 @@ function renderTable(){
       </td>`;
     }).join('');
 
-    // Logro badge
-    const badge=avg!==null
-      ?`<span class="lb lb-${l}"><span class="ln">${avg.toFixed(1)}</span><span class="ll">${l}</span></span>`
-      :`<span class="lb lb-e"><span class="ln">—</span><span class="ll">—</span></span>`;
+    // Logro badge — use manual override if set
+    const effectiveVal = logroOverrides[i] !== undefined ? logroOverrides[i] : avg;
+    const effectiveL   = effectiveVal !== null ? toLetter(effectiveVal) : '';
+    const badge = buildLogroBadge(effectiveVal, effectiveL, i, isDir||isAuxiliar);
 
     // Name — clickable to open profile
     const prof=studentProfiles[i]||{};
@@ -2068,19 +2069,16 @@ function renderTable(){
 // ── Update logro badge for a student instantly ──
 function updateLogroBadge(i){
   const avg=wAvg(i,bimGrades);
-  // Find the row by student index
+  const effectiveVal = logroOverrides[i] !== undefined ? logroOverrides[i] : avg;
+  const effectiveL   = effectiveVal !== null ? toLetter(effectiveVal) : '';
   const inputs=document.querySelectorAll(`[data-i="${i}"]`);
   if(!inputs.length) return;
   const row=inputs[0].closest('tr');
   if(!row) return;
   const ltd=row.querySelector('td:last-child');
   if(!ltd) return;
-  if(avg!==null){
-    const l=toLetter(avg);
-    ltd.innerHTML=`<span class="lb lb-${l}"><span class="ln">${avg.toFixed(1)}</span><span class="ll">${l}</span></span>`;
-  } else {
-    ltd.innerHTML=`<span class="lb lb-e"><span class="ln">—</span><span class="ll">—</span></span>`;
-  }
+  const isDir=currentUser&&(currentUser.rol==='director'||currentUser.rol==='auxiliar');
+  ltd.innerHTML=buildLogroBadge(effectiveVal, effectiveL, i, isDir);
 }
 
 
@@ -2928,80 +2926,95 @@ async function dirReleaseCoursePanel(cid,grado,seccion){
 // ══════════════════════════════════════════
 //  ORDENAR ALFABÉTICAMENTE
 // ══════════════════════════════════════════
+// ── Helper: lectura SEGURA — distingue "no existe" de "falló la consulta" ──
+async function safeReadSnapshot(grado,seccion,bimestre,curso_id){
+  const {data,error} = await db.from('registros').select('estudiante_nombre')
+    .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+    .eq('curso_id',curso_id).eq('columna_key','snapshot').maybeSingle();
+  if(error) throw new Error(`Falló lectura ${curso_id} (${bimestre}): ${error.message}`);
+  return data ? (JSON.parse(data.estudiante_nombre)||{}) : {};
+}
+
+async function safeWriteSnapshot(grado,seccion,bimestre,curso_id,payload){
+  const {error:delErr} = await db.from('registros').delete()
+    .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bimestre)
+    .eq('curso_id',curso_id).eq('columna_key','snapshot');
+  if(delErr) throw new Error(`Falló borrado ${curso_id} (${bimestre}): ${delErr.message}`);
+  const {error:insErr} = await db.from('registros').insert({
+    grado,seccion,bimestre,curso_id,
+    estudiante_idx:-1,columna_key:'snapshot',
+    estudiante_nombre:JSON.stringify(payload),
+    docente_nombre:currentUser.nombre,
+    updated_at:new Date().toISOString()
+  });
+  if(insErr) throw new Error(`Falló guardado ${curso_id} (${bimestre}): ${insErr.message}`);
+}
+
+const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+
 async function sortAlphabetically(){
   const {grado,seccion,bimestre:curBim}=getCtx();
   const ALL_BIMS=['I','II','III','IV'];
 
-  setSyncState('saving','guardando antes de ordenar...');
-  toast('Ordenando los 4 bimestres... espera un momento','ok');
+  if(!confirm(`Vas a ordenar A–Z TODOS los cursos y los 4 bimestres de ${grado} Secc. ${seccion}.\n\nEsto puede tardar 1-2 minutos. NO cierres ni recargues la página durante el proceso.\n\n¿Continuar?`)) return;
 
-  // STEP 0: Sync numStudents + pre-save current course+bimestre (the one being edited right now)
+  setSyncState('saving','guardando antes de ordenar...');
+  toast('Paso 1/3: guardando cambios actuales...','ok');
+
   numStudents = Math.max(numStudents, names.filter(n=>n&&n.trim()!=='').length);
   document.getElementById('sel-nalum').value = numStudents;
 
+  // ══ STEP 0: Pre-save current course (lo que se está editando ahora) ══
   try{
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion)
-      .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre:'all',curso_id:'_names',
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify({names,numStudents}),
-      docente_nombre:currentUser.nombre,
-      updated_at:new Date().toISOString()
-    });
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion).eq('bimestre',curBim)
-      .eq('curso_id',activeCourse).eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre:curBim,curso_id:activeCourse,
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify(grades),
-      docente_nombre:currentUser.nombre,
-      updated_at:new Date().toISOString()
-    });
-    await new Promise(r=>setTimeout(r,400));
-  }catch(e){ toast('Error pre-guardando: '+e.message,'err'); return; }
+    await safeWriteSnapshot(grado,seccion,'all','_names',{names,numStudents});
+    await safeWriteSnapshot(grado,seccion,curBim,activeCourse,grades);
+    await sleep(300);
+  }catch(e){
+    setSyncState('error','error');
+    toast('❌ Detenido — no se guardó nada. Error: '+e.message,'err');
+    return;
+  }
 
-  // STEP 1: Load EVERYTHING for ALL 4 bimestres — courses, bimestral, comportamiento, locks
-  setSyncState('saving','cargando los 4 bimestres...');
-
-  const dataByBim={}; // dataByBim[bim] = {courses:{cid:{idx:row}}, bim:{}, comp:{}, locked:bool}
+  // ══ STEP 1: Leer TODO con verificación de errores estricta ══
+  setSyncState('saving','Paso 2/3: leyendo datos...');
+  const dataByBim={};
   let profilesData=[];
+  const profKey=`profiles_${grado}_${seccion}`;
 
   try{
     for(const bim of ALL_BIMS){
-      dataByBim[bim]={courses:{},bim:{},comp:{},locked:false};
+      dataByBim[bim]={courses:{},bim:{},comp:{}};
 
       for(const course of COURSES){
-        const {data:gr}=await db.from('registros').select('estudiante_nombre')
-          .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
-          .eq('curso_id',course.id).eq('columna_key','snapshot').maybeSingle();
-        dataByBim[bim].courses[course.id]=gr?JSON.parse(gr.estudiante_nombre)||{}:{};
+        // Reintenta una vez si falla, con pequeña pausa
+        let attempt=0, ok=false, lastErr=null;
+        while(attempt<2 && !ok){
+          try{
+            dataByBim[bim].courses[course.id]=await safeReadSnapshot(grado,seccion,bim,course.id);
+            ok=true;
+          }catch(e){ lastErr=e; attempt++; await sleep(500); }
+        }
+        if(!ok) throw lastErr;
+        await sleep(40); // pausa anti-saturación
       }
 
-      const {data:bm}=await db.from('registros').select('estudiante_nombre')
-        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
-        .eq('curso_id','_bimestral').eq('columna_key','snapshot').maybeSingle();
-      dataByBim[bim].bim = bm?JSON.parse(bm.estudiante_nombre)||{}:{};
-
-      const {data:cm}=await db.from('registros').select('estudiante_nombre')
-        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
-        .eq('curso_id','_comportamiento').eq('columna_key','snapshot').maybeSingle();
-      dataByBim[bim].comp = cm?JSON.parse(cm.estudiante_nombre)||{}:{};
-
-      // Check lock status (informational only — reordering positions is always allowed)
-      const {data:lk}=await db.from('configuracion').select('valor').eq('id',`lock_${grado}_${seccion}_${bim}`).maybeSingle();
-      dataByBim[bim].locked = lk ? lk.valor==='true' : false;
+      dataByBim[bim].bim  = await safeReadSnapshot(grado,seccion,bim,'_bimestral');
+      await sleep(40);
+      dataByBim[bim].comp = await safeReadSnapshot(grado,seccion,bim,'_comportamiento');
+      await sleep(40);
     }
 
-    const profKey=`profiles_${grado}_${seccion}`;
-    const {data:pr}=await db.from('configuracion').select('valor').eq('id',profKey).maybeSingle();
-    profilesData=pr?JSON.parse(pr.valor)||[]:[];
+    const {data:pr,error:prErr} = await db.from('configuracion').select('valor').eq('id',profKey).maybeSingle();
+    if(prErr) throw new Error('Falló lectura de perfiles: '+prErr.message);
+    profilesData = pr ? (JSON.parse(pr.valor)||[]) : [];
 
-  }catch(e){ toast('Error cargando datos: '+e.message,'err'); setSyncState('error','error'); return; }
+  }catch(e){
+    setSyncState('error','error');
+    toast('❌ DETENIDO sin guardar nada — falló la lectura: '+e.message+'. Tus notas NO fueron tocadas. Intenta de nuevo en un minuto.','err');
+    return;
+  }
 
-  // STEP 2: Build complete student objects with data from ALL 4 bimestres
+  // ══ STEP 2: Construir estudiantes completos ══
   const activeLen = Object.keys(dataByBim[curBim].courses[activeCourse]||{}).length;
   const totalSlots = Math.max(numStudents, names.length, activeLen);
 
@@ -3018,13 +3031,12 @@ async function sortAlphabetically(){
     return s;
   });
 
-  // STEP 3: Sort A-Z (named first, blanks at bottom) — this defines the NEW global order
+  // ══ STEP 3: Ordenar A-Z ══
   const named   = students.filter(s=>s.name.trim()!=='');
   const unnamed = students.filter(s=>s.name.trim()==='');
   named.sort((a,b)=>a.name.trim().localeCompare(b.name.trim(),'es',{sensitivity:'base'}));
   const sorted = [...named, ...unnamed];
 
-  // STEP 4: Rebuild arrays for ALL 4 bimestres with the new order
   const newNames=[]; const newProfiles=[];
   const newPerBim={}; ALL_BIMS.forEach(bim=>{ newPerBim[bim]={courses:{},bim:{},comp:{}}; COURSES.forEach(c=>{newPerBim[bim].courses[c.id]={};}); });
 
@@ -3040,7 +3052,41 @@ async function sortAlphabetically(){
 
   const newNumStudents=Math.max(named.length,1);
 
-  // Update in-memory state for the CURRENT view
+  // ══ STEP 4: Guardar TODO — si algo falla, avisar exactamente qué quedó a medias ══
+  setSyncState('saving','Paso 3/3: guardando resultado...');
+  toast('Paso 3/3: guardando resultado ordenado...','ok');
+
+  const savedOk=[]; const failedItems=[];
+  try{
+    await safeWriteSnapshot(grado,seccion,'all','_names',{names:newNames,numStudents:newNumStudents});
+    savedOk.push('_names');
+  }catch(e){
+    toast('❌ Falló al guardar nombres — se detuvo todo antes de tocar las notas. '+e.message,'err');
+    setSyncState('error','error');
+    return;
+  }
+
+  for(const bim of ALL_BIMS){
+    for(const course of COURSES){
+      try{
+        await safeWriteSnapshot(grado,seccion,bim,course.id,newPerBim[bim].courses[course.id]);
+        savedOk.push(`${course.id}-${bim}`);
+        await sleep(30);
+      }catch(e){
+        failedItems.push(`${course.label||course.id} (Bim.${bim}): ${e.message}`);
+      }
+    }
+    try{ await safeWriteSnapshot(grado,seccion,bim,'_bimestral',newPerBim[bim].bim); }
+    catch(e){ failedItems.push(`Bimestral (Bim.${bim}): ${e.message}`); }
+    try{ await safeWriteSnapshot(grado,seccion,bim,'_comportamiento',newPerBim[bim].comp); }
+    catch(e){ failedItems.push(`Comportamiento (Bim.${bim}): ${e.message}`); }
+  }
+
+  try{
+    await db.from('configuracion').upsert({id:profKey, valor:JSON.stringify(newProfiles), updated_at:new Date().toISOString()});
+  }catch(e){ failedItems.push('Perfiles: '+e.message); }
+
+  // Update in-memory state for current view
   names=newNames;
   numStudents=newNumStudents;
   document.getElementById('sel-nalum').value=numStudents;
@@ -3049,70 +3095,16 @@ async function sortAlphabetically(){
   compGrades=newPerBim[curBim].comp;
   studentProfiles=newProfiles;
 
-  // STEP 5: Save EVERYTHING — names once, then all 4 bimestres × all courses + bim + comp
-  setSyncState('saving','guardando los 4 bimestres...');
-  try{
-    await db.from('registros').delete()
-      .eq('grado',grado).eq('seccion',seccion)
-      .eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot');
-    await db.from('registros').insert({
-      grado,seccion,bimestre:'all',curso_id:'_names',
-      estudiante_idx:-1,columna_key:'snapshot',
-      estudiante_nombre:JSON.stringify({names,numStudents}),
-      docente_nombre:currentUser.nombre,
-      updated_at:new Date().toISOString()
-    });
-
-    for(const bim of ALL_BIMS){
-      for(const course of COURSES){
-        await db.from('registros').delete()
-          .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
-          .eq('curso_id',course.id).eq('columna_key','snapshot');
-        await db.from('registros').insert({
-          grado,seccion,bimestre:bim,curso_id:course.id,
-          estudiante_idx:-1,columna_key:'snapshot',
-          estudiante_nombre:JSON.stringify(newPerBim[bim].courses[course.id]),
-          docente_nombre:currentUser.nombre,
-          updated_at:new Date().toISOString()
-        });
-      }
-      await db.from('registros').delete()
-        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
-        .eq('curso_id','_bimestral').eq('columna_key','snapshot');
-      await db.from('registros').insert({
-        grado,seccion,bimestre:bim,curso_id:'_bimestral',
-        estudiante_idx:-1,columna_key:'snapshot',
-        estudiante_nombre:JSON.stringify(newPerBim[bim].bim),
-        docente_nombre:currentUser.nombre,
-        updated_at:new Date().toISOString()
-      });
-      await db.from('registros').delete()
-        .eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim)
-        .eq('curso_id','_comportamiento').eq('columna_key','snapshot');
-      await db.from('registros').insert({
-        grado,seccion,bimestre:bim,curso_id:'_comportamiento',
-        estudiante_idx:-1,columna_key:'snapshot',
-        estudiante_nombre:JSON.stringify(newPerBim[bim].comp),
-        docente_nombre:currentUser.nombre,
-        updated_at:new Date().toISOString()
-      });
-    }
-
-    await db.from('configuracion').upsert({
-      id:profKey, valor:JSON.stringify(newProfiles),
-      updated_at:new Date().toISOString()
-    });
-
+  if(failedItems.length){
+    setSyncState('error','guardado parcial');
+    toast(`⚠️ ATENCIÓN: ${failedItems.length} elemento(s) NO se guardaron. Repite "Orden A-Z" para reintentar solo lo que falló. Detalle: ${failedItems.slice(0,3).join(' | ')}`,'err');
+    console.error('Sort - items fallidos:', failedItems);
+  } else {
     setSyncState('ok','orden guardado ✓');
-    const lockedBims=ALL_BIMS.filter(b=>dataByBim[b].locked);
-    toast(`✓ Orden A–Z aplicado a los 4 bimestres${lockedBims.length?' (incluye bloqueados: '+lockedBims.join(', ')+', solo se movió posición, no valores)':''}`,'ok');
-    renderTable();
-    renderStats();
-
-  }catch(e){
-    setSyncState('error','error');
-    toast('Error al guardar orden: '+e.message,'err');
+    toast('✓ Orden A–Z completado correctamente en los 4 bimestres','ok');
   }
+  renderTable();
+  renderStats();
 }
 
 
@@ -3331,6 +3323,14 @@ async function loadAllBoletaData(){
 
 // Calc weighted avg from boleta data
 function calcBoletaAvg(studentIdx, bim, courseId){
+  // Check for manual logro override in boletaData
+  const overrideKey=`logro_${boletaCtxGrado||''}_${boletaCtxSeccion||''}_${bim}_${courseId}`;
+  // Overrides are loaded per-course when needed
+  const raw = calcBoletaAvgRaw(studentIdx, bim, courseId);
+  return raw;
+}
+
+function calcBoletaAvgRaw(studentIdx, bim, courseId){
   const g = boletaData[bim]?.[courseId] || {};
   const bd= boletaBimData[bim] || {};
   const si = studentIdx;
@@ -3521,13 +3521,13 @@ function buildBoletaHTML(studentIdx, bimestres, logoSrc, grado, seccion){
   const ct={AD:'#0E6E45',A:'#1558A0',B:'#7A5C0A',C:'#9B1B1B'};
   function numCell(v, bold=false){
     const l=v!==null?toLetter(v):'';
-    // Light backgrounds + black bold text to save ink
     const bgMap={AD:'#C8F0DC',A:'#C8DFF8',B:'#FEF0B0',C:'#FAD0D0'};
     const txMap={AD:'#0A5C38',A:'#0D3D80',B:'#5A4000',C:'#7A1010'};
     const bg=l?bgMap[l]:ROWBG2;
     const tx=l?txMap[l]:'#000000';
+    const disp=v!==null?Math.round(v):'—';
     return `<td style="text-align:center;padding:4px 3px;background:${bg};border:1px solid #C5D8EE;">
-      <span style="color:${tx};font-weight:800;font-family:'JetBrains Mono',monospace;font-size:${bold?13:11}px;">${v!==null?v:'—'}</span>
+      <span style="color:${tx};font-weight:800;font-family:'JetBrains Mono',monospace;font-size:${bold?13:11}px;">${disp}</span>
     </td>`;
   }
 
@@ -4242,6 +4242,65 @@ async function applyActToComportamiento(){
 }
 
 
+
+async function saveLogroOverrides(){
+  const {grado,seccion,bimestre}=getCtx();
+  const logroKey=`logro_${grado}_${seccion}_${bimestre}_${activeCourse}`;
+  try{
+    await db.from('configuracion').upsert({
+      id:logroKey, valor:JSON.stringify(logroOverrides),
+      updated_at:new Date().toISOString()
+    });
+  }catch(e){ toast('Error guardando logro manual','err'); }
+}
+
+function onLogroManual(input, i){
+  const v = input.value.trim();
+  if(v === ''){
+    delete logroOverrides[i];
+  } else {
+    let n = parseFloat(v);
+    if(isNaN(n)) return;
+    n = Math.min(20, Math.max(0, Math.round(n)));
+    input.value = n;
+    logroOverrides[i] = n;
+  }
+  // Update badge
+  const val = logroOverrides[i] !== undefined ? logroOverrides[i] : wAvg(i, bimGrades);
+  const avg = val !== null ? val : null;
+  if(avg !== null){
+    const l = toLetter(avg);
+    const row = input.closest('tr');
+    const ltd = row?.querySelector('td:last-child');
+    if(ltd) ltd.innerHTML = buildLogroBadge(avg, l, i, true);
+  }
+  clearTimeout(window._logroTimer);
+  window._logroTimer = setTimeout(saveLogroOverrides, 800);
+}
+
+function buildLogroBadge(avg, l, i, isDir){
+  if(!isDir){
+    return `<span class="lb lb-${l||'e'}"><span class="ln">${avg!==null?Math.round(avg):'—'}</span><span class="ll">${l||'—'}</span></span>`;
+  }
+  const overrideVal = logroOverrides[i] !== undefined ? logroOverrides[i] : '';
+  const dispVal = logroOverrides[i] !== undefined ? logroOverrides[i] : (avg!==null?Math.round(avg):'');
+  const dispL = logroOverrides[i] !== undefined ? toLetter(logroOverrides[i]) : (l||'');
+  const isManual = logroOverrides[i] !== undefined;
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+    <span class="lb lb-${dispL||'e'}" style="${isManual?'border:2px solid #F59E0B;':''}" title="${isManual?'Nota manual — clic para editar':'Calculada automáticamente'}">
+      <span class="ln">${dispVal||'—'}</span>
+      <span class="ll">${dispL||'—'}</span>
+    </span>
+    <input type="number" min="0" max="20" step="1"
+      value="${overrideVal}"
+      placeholder="Manual"
+      data-i="${i}"
+      oninput="onLogroManual(this,${i})"
+      style="width:46px;height:18px;text-align:center;font-size:9px;border:1px solid ${isManual?'#F59E0B':'var(--border)'};border-radius:4px;font-family:'JetBrains Mono',monospace;background:${isManual?'#FFFBEB':'var(--surf2)'};color:${isManual?'#92400E':'var(--text3)'};outline:none;"
+      title="Deja vacío para usar el promedio calculado">
+  </div>`;
+}
+
 // ══════════════════════════════════════════
 //  BLOQUEO DE BIMESTRE (Solo Director)
 // ══════════════════════════════════════════
@@ -4510,7 +4569,7 @@ function renderDashCharts(activeCourses, courseAgg, totals, totalEv){
   const bc = document.getElementById('bar-chart');
   if(bc && activeCourses.length>0){
     const labels = activeCourses.map(c=>c.short);
-    const proms  = activeCourses.map(c=>parseFloat((courseAgg[c.id].sum/courseAgg[c.id].n).toFixed(1)));
+    const proms  = activeCourses.map(c=>parseFloat((courseAgg[c.id].sum/courseAgg[c.id].n)));
     const colors = proms.map(p=>p>=18?AD_C:p>=14?A_C:p>=11?B_C:C_C);
     _charts['bar'] = new Chart(bc, {
       type:'bar',
