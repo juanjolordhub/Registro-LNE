@@ -4262,18 +4262,27 @@ function onLogroManual(input, i){
     let n = parseFloat(v);
     if(isNaN(n)) return;
     n = Math.min(20, Math.max(0, Math.round(n)));
-    input.value = n;
     logroOverrides[i] = n;
   }
-  // Update badge
-  const val = logroOverrides[i] !== undefined ? logroOverrides[i] : wAvg(i, bimGrades);
-  const avg = val !== null ? val : null;
-  if(avg !== null){
-    const l = toLetter(avg);
-    const row = input.closest('tr');
-    const ltd = row?.querySelector('td:last-child');
-    if(ltd) ltd.innerHTML = buildLogroBadge(avg, l, i, true);
+
+  // Update ONLY the badge span — do NOT rebuild innerHTML (avoids focus loss)
+  const effectiveVal = logroOverrides[i] !== undefined ? logroOverrides[i] : wAvg(i, bimGrades);
+  const l = effectiveVal !== null ? toLetter(effectiveVal) : '';
+  const row = input.closest('tr');
+  if(row){
+    const badge = row.querySelector(`.lb-badge-${i}`);
+    if(badge){
+      badge.className = `lb lb-${l||'e'} lb-badge-${i}`;
+      badge.querySelector('.ln').textContent = effectiveVal !== null ? Math.round(effectiveVal) : '—';
+      badge.querySelector('.ll').textContent = l || '—';
+      const isManual = logroOverrides[i] !== undefined;
+      badge.style.border = isManual ? '2px solid #F59E0B' : '';
+    }
+    // Update input style
+    input.style.borderColor = logroOverrides[i] !== undefined ? '#F59E0B' : 'var(--border)';
+    input.style.background  = logroOverrides[i] !== undefined ? '#FFFBEB' : 'var(--surf2)';
   }
+
   clearTimeout(window._logroTimer);
   window._logroTimer = setTimeout(saveLogroOverrides, 800);
 }
@@ -4287,18 +4296,68 @@ function buildLogroBadge(avg, l, i, isDir){
   const dispL = logroOverrides[i] !== undefined ? toLetter(logroOverrides[i]) : (l||'');
   const isManual = logroOverrides[i] !== undefined;
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-    <span class="lb lb-${dispL||'e'}" style="${isManual?'border:2px solid #F59E0B;':''}" title="${isManual?'Nota manual — clic para editar':'Calculada automáticamente'}">
+    <span class="lb lb-${dispL||'e'} lb-badge-${i}" style="${isManual?'border:2px solid #F59E0B;':''}" title="${isManual?'Nota manual':'Calculada automáticamente'}">
       <span class="ln">${dispVal||'—'}</span>
       <span class="ll">${dispL||'—'}</span>
     </span>
-    <input type="number" min="0" max="20" step="1"
-      value="${overrideVal}"
-      placeholder="Manual"
-      data-i="${i}"
-      oninput="onLogroManual(this,${i})"
-      style="width:46px;height:18px;text-align:center;font-size:9px;border:1px solid ${isManual?'#F59E0B':'var(--border)'};border-radius:4px;font-family:'JetBrains Mono',monospace;background:${isManual?'#FFFBEB':'var(--surf2)'};color:${isManual?'#92400E':'var(--text3)'};outline:none;"
-      title="Deja vacío para usar el promedio calculado">
+    <div style="display:flex;gap:2px;align-items:center;">
+      <input type="number" min="0" max="20" step="1"
+        value="${overrideVal}"
+        placeholder="—"
+        data-i="${i}"
+        oninput="onLogroManual(this,${i})"
+        style="width:38px;height:18px;text-align:center;font-size:9px;border:1px solid ${isManual?'#F59E0B':'var(--border)'};border-radius:4px;font-family:'JetBrains Mono',monospace;background:${isManual?'#FFFBEB':'var(--surf2)'};color:${isManual?'#92400E':'var(--text3)'};outline:none;"
+        title="Nota manual (deja vacío para calcular automáticamente)">
+      <button onclick="fillSemanasFromLogro(${i})" title="Rellenar las 9 semanas con este valor"
+        style="width:16px;height:18px;border:1px solid var(--border);border-radius:3px;background:var(--accent-l);color:var(--accent);font-size:9px;cursor:pointer;padding:0;line-height:1;">↓</button>
+    </div>
   </div>`;
+}
+
+
+function fillSemanasFromLogro(i){
+  const target = logroOverrides[i];
+  if(target === undefined){
+    toast('Primero ingresa un logro manual en el campo','warn');
+    return;
+  }
+  if(!confirm(`¿Generar notas variadas para que el promedio del estudiante ${names[i]||i+1} sea ${target}?\n\nSe rellenarán: Semanas S1-S9, Exposiciones y Comportamiento con valores aleatorios que promediaen a ${target}.`)) return;
+
+  // ── Generate varied values that average to target ──
+  function genVaried(count, tgt){
+    const min = Math.max(0,  tgt - 3);
+    const max = Math.min(20, tgt + 3);
+    const vals = [];
+    let sum = 0;
+    for(let k = 0; k < count - 1; k++){
+      // Random integer in [min, max]
+      const v = Math.round(min + Math.random() * (max - min));
+      vals.push(v);
+      sum += v;
+    }
+    // Last value to make exact average = tgt
+    let last = Math.round(tgt * count - sum);
+    // Clamp to valid range
+    if(last < 0) last = 0;
+    if(last > 20) last = 20;
+    vals.push(last);
+    // Shuffle
+    for(let k = vals.length - 1; k > 0; k--){
+      const j = Math.floor(Math.random() * (k + 1));
+      [vals[k], vals[j]] = [vals[j], vals[k]];
+    }
+    return vals;
+  }
+
+  if(!grades[i]) grades[i]={};
+
+  // Solo rellenar S1-S9 con valores variados que promedien al target
+  const semVals = genVaried(9, target);
+  for(let s = 1; s <= 9; s++) grades[i][`s${s}`] = semVals[s-1];
+
+  renderTable();
+  scheduleSave();
+  toast(`✓ Semanas S1-S9 generadas con promedio ${target} · Expo y Comportamiento quedan para nota manual`,'ok');
 }
 
 // ══════════════════════════════════════════
