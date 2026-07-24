@@ -3789,10 +3789,13 @@ function printCurrentRegister(){
       return`<td style="text-align:center;font-size:9px;padding:2px;border:1px solid #E0B840;background:${bg};color:${tx};font-weight:${l?700:400};">${d}</td>`;
     }).join('');
 
-    // Logro
-    const avg=wAvg(i,bimGrades); const l=avg!==null?toLetter(avg):'';
+    // Logro — use manual override if set
+    const calcAvg=wAvg(i,bimGrades);
+    const avg=logroOverrides[i]!==undefined?logroOverrides[i]:calcAvg;
+    const l=avg!==null?toLetter(avg):'';
     const lBg=l?cc[l]:'#F9F7F4'; const lTx=l?ct[l]:'#A09890';
-    const lTd=`<td style="text-align:center;background:${lBg};color:${lTx};font-weight:800;font-size:10px;padding:3px;border:1px solid #B0C8E8;">${avg!==null?avg+' '+l:'—'}</td>`;
+    const manualMark=logroOverrides[i]!==undefined?'*':'';
+    const lTd=`<td style="text-align:center;background:${lBg};color:${lTx};font-weight:800;font-size:10px;padding:3px;border:1px solid #B0C8E8;">${avg!==null?Math.round(avg)+' '+l+manualMark:'—'}</td>`;
 
     return`<tr>
       <td style="padding:2px 4px;font-size:9px;color:#A09890;text-align:center;border:1px solid #EDE9E2;background:${rowBg};">${i+1}</td>
