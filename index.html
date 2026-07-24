@@ -4990,11 +4990,13 @@ function exportTeacherPDF(){
   let ev=0,sumP=0,nP=0; const cnt={AD:0,A:0,B:0,C:0};
   const studentRows=[];
   for(let i=0;i<numStudents;i++){
-    let sw=0,sv=0;
-    COLS.forEach(col=>{const v=(grades[i]||{})[col.key];if(v!==''&&v!==undefined&&v!==null){sv+=parseInt(v)*col.w;sw+=col.w;}});
-    const avg=sw?Math.round(sv/sw):null;
-    if(avg!==null){ev++;cnt[toLetter(avg)]++;sumP+=avg;nP++;}
-    studentRows.push({name:names[i]||'—',avg,letter:avg!==null?toLetter(avg):'—'});
+    if(!names[i]) continue;
+    // Use manual override if set, otherwise calculate
+    const calcAvg = wAvg(i, bimGrades);
+    const avg = logroOverrides[i]!==undefined ? logroOverrides[i] : calcAvg;
+    const finalAvg = avg!==null ? Math.round(avg) : null;
+    if(finalAvg!==null){ev++;cnt[toLetter(finalAvg)]++;sumP+=finalAvg;nP++;}
+    studentRows.push({name:names[i]||'—',avg:finalAvg,letter:finalAvg!==null?toLetter(finalAvg):'—'});
   }
   const promClase=nP?Math.round(sumP/nP):0;
   const logoSrc=document.getElementById('tb-logo-img').src||'';
