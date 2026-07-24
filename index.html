@@ -2177,7 +2177,12 @@ function navKey(e,i,k){
 // ══════════════════════════════════════════
 function renderStats(){
   let ev=0; const cnt={AD:0,A:0,B:0,C:0};
-  for(let i=0;i<numStudents;i++){const a=wAvg(i,bimGrades);if(a!==null){ev++;cnt[toLetter(a)]++;}}
+  for(let i=0;i<numStudents;i++){
+    // Use manual override if set, otherwise calculated avg
+    const calc=wAvg(i,bimGrades);
+    const a=logroOverrides[i]!==undefined?logroOverrides[i]:calc;
+    if(a!==null){ev++;cnt[toLetter(a)]++;}
+  }
 
   // Top pills
   document.getElementById('stats-row').innerHTML=`
