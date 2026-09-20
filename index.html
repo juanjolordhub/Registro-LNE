@@ -194,6 +194,7 @@ tr:hover td{background:var(--surf3);}
 .doc-actions{display:flex;gap:6px;}
 .btn-sm{padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;}
 .btn-del{background:var(--red-l);border-color:var(--c-br);color:var(--red);}
+.btn-release{background:#FEF3C7;border-color:#FDE68A;color:#92400E;}
 .btn-del:hover{background:#f5c5c5;}
 .btn-edit{background:var(--accent-l);border-color:var(--accent);color:var(--accent);}
 .btn-edit:hover{background:#d0dff5;}
@@ -364,6 +365,12 @@ tr:hover td{background:var(--surf3);}
 .act-week-btn:hover{background:var(--surf2);}
 .act-summary-row td{background:linear-gradient(135deg,#EFF6FF,#DBEAFE)!important;font-weight:800!important;font-size:11px!important;}
 .act-prom-cell{font-size:11px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.hora-input{width:60px;font-size:9px;padding:2px;border:1.5px solid var(--border);border-radius:4px;font-family:'Plus Jakarta Sans',sans-serif;background:var(--surf);color:var(--text);}
+.hora-input:focus{border-color:var(--accent);outline:none;}
+.hora-badge{margin-top:2px;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px;white-space:nowrap;display:inline-block;}
+.hora-badge-puntual{background:#D1FAE5;color:#065F46;}
+.hora-badge-tarde{background:#FEF3C7;color:#92400E;}
+.hora-badge-falto{background:#FEE2E2;color:#991B1B;}
 
 /* NOTES BOX */
 .notes-box{background:var(--surf);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);margin-top:14px;}
@@ -2281,6 +2288,7 @@ async function loadDocentesPanel(){
       </div>
       <div class="doc-actions">
         <button class="btn-sm btn-edit" onclick="openEditModal('${d.id}','${d.nombre}','${d.rol}')">Editar</button>
+        ${d.rol==='docente'?`<button class="btn-sm btn-release" onclick="releaseAllCoursesFromDocente('${d.nombre.replace(/'/g,"\\'")}')" title="Quita todos los cursos asignados a este docente en todos los grados y secciones">🧹 Liberar cursos</button>`:''}
         ${d.id!==currentUser.id?`<button class="btn-sm btn-del" onclick="deleteDocente('${d.id}','${d.nombre}')">Eliminar</button>`:''}
       </div>
     </div>`
@@ -2305,6 +2313,54 @@ async function addDocente(){
     document.getElementById('nd-pin').value='';
     loadDocentesPanel();
   }catch(e){toast('Error: '+e.message,'err');}
+}
+
+// ── LIBERAR TODOS LOS CURSOS DE UN DOCENTE (barrido en todos los grados/secciones) ──
+async function releaseAllCoursesFromDocente(nombre){
+  if(!confirm(`¿Quitarle a "${nombre}" TODOS los cursos asignados, en todos los grados y secciones?\n\nQuedarán sin asignar para que cualquier docente pueda tomarlos.`))return;
+  toast('Buscando y liberando cursos...','ok');
+  const grados=['3 Añitos','4 Añitos','5 Añitos','1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta'];
+  const secciones=['A','B','C','D','E','Única'];
+  let liberados=0;
+  const cursosLiberados=[];
+  for(const grado of grados){
+    for(const seccion of secciones){
+      const key=`assign_${grado}_${seccion}`;
+      try{
+        const {data}=await db.from('configuracion').select('valor').eq('id',key).maybeSingle();
+        if(!data)continue;
+        let assignments={};
+        try{ assignments=JSON.parse(data.valor)||{}; }catch(e){ continue; }
+        let changed=false;
+        for(const cid of Object.keys(assignments)){
+          if(assignments[cid]===nombre){
+            delete assignments[cid];
+            changed=true; liberados++;
+            const label=COURSES.find(c=>c.id===cid)?.label||cid;
+            cursosLiberados.push(`${label} (${grado} ${seccion})`);
+          }
+        }
+        if(changed){
+          await db.from('configuracion').upsert({id:key,valor:JSON.stringify(assignments),updated_at:new Date().toISOString()});
+        }
+      }catch(e){}
+    }
+  }
+  if(liberados===0){
+    toast(`${nombre} no tenía cursos asignados`,'warn');
+  }else{
+    toast(`✓ Se liberaron ${liberados} curso(s) de ${nombre}`,'ok');
+  }
+  // Refresh visible panels if affected
+  const gSel=document.getElementById('sel-grado'), sSel=document.getElementById('sel-seccion');
+  if(gSel&&sSel&&document.getElementById('view-asignacion')?.classList.contains('active')){
+    renderAssignmentPanel();
+  }
+  if(courseOwnerName===nombre){
+    delete courseAssignments[activeCourse];
+    courseOwnerName=null;
+    renderTable();
+  }
 }
 
 async function deleteDocente(id,nombre){
@@ -4032,6 +4088,26 @@ async function saveActitudinalWeek(){
   }catch(e){ toast('Error guardando actitudinal','err'); }
 }
 
+// ── HORA DE INGRESO: Puntual (<=08:00) / Tarde (>08:00) / Faltó (sin hora) ──
+function getHoraEstado(hora){
+  if(!hora) return {label:'Faltó', cls:'falto'};
+  if(hora<='08:00') return {label:'Puntual', cls:'puntual'};
+  return {label:'Tarde', cls:'tarde'};
+}
+
+function updateHora(si,dayKey,val){
+  const wk=getWeekKey(actWeekOffset);
+  if(!actData[wk])actData[wk]={};
+  if(!actData[wk][si])actData[wk][si]={};
+  if(!actData[wk][si][dayKey])actData[wk][si][dayKey]={};
+  actData[wk][si][dayKey].hora=val;
+  const estado=getHoraEstado(val);
+  const badge=document.getElementById(`hora-estado-${si}-${dayKey}`);
+  if(badge){ badge.textContent=estado.label; badge.className=`hora-badge hora-badge-${estado.cls}`; }
+  clearTimeout(window._actSaveTimer);
+  window._actSaveTimer=setTimeout(saveActitudinalWeek,1000);
+}
+
 function cycleActBtn(btn,si,dayKey,crit){
   const cur=((actData[getWeekKey(actWeekOffset)]||{})[si]||{})[dayKey]?.[crit]||'';
   const idx=ACT_CYCLE.indexOf(cur);
@@ -4082,26 +4158,36 @@ function renderActWeek(){
 
   // Build header: day columns × 4 criteria
   const dayHeaders=days.map(d=>`
-    <th colspan="4" style="background:#1A4E9A;color:white;padding:4px;border:1px solid #3B7DD8;text-align:center;">
+    <th colspan="5" style="background:#1A4E9A;color:white;padding:4px;border:1px solid #3B7DD8;text-align:center;">
       <div class="act-day-hdr"><span class="act-day-name">${d.name}</span><span class="act-day-date">${d.date}</span></div>
     </th>`).join('');
 
   const critHeaders=days.map(()=>
     ACT_CRITERIOS.map(c=>`<th style="background:#2563B0;color:white;padding:3px 2px;border:1px solid #3B7DD8;font-size:8px;" title="${c.label}">${c.icon}</th>`).join('')
+    + `<th style="background:#2563B0;color:white;padding:3px 2px;border:1px solid #3B7DD8;font-size:8px;" title="Hora de ingreso (Puntual hasta las 08:00)">🕒</th>`
   ).join('');
 
   const rows=students.map(s=>{
     const si=s.idx;
-    const dayCells=days.map(d=>
-      ACT_CRITERIOS.map(c=>{
+    const dayCells=days.map(d=>{
+      const critCells=ACT_CRITERIOS.map(c=>{
         const v=actData[wk]?.[si]?.[d.key]?.[c.key]||'';
         return`<td style="padding:1px 2px;border:1px solid #D6E4F7;">
           <button class="act-btn${v?' act-btn-'+v:''}" 
             onclick="cycleActBtn(this,${si},'${d.key}','${c.key}')"
             title="${ACT_VALS[v]?.label||'Sin registrar'}">${v||'—'}</button>
         </td>`;
-      }).join('')
-    ).join('');
+      }).join('');
+      const hora=actData[wk]?.[si]?.[d.key]?.hora||'';
+      const estado=getHoraEstado(hora);
+      const horaCell=`<td style="padding:1px 2px;border:1px solid #D6E4F7;text-align:center;">
+        <input type="time" class="hora-input" value="${hora}"
+          onchange="updateHora(${si},'${d.key}',this.value)"
+          title="Hora de ingreso">
+        <div id="hora-estado-${si}-${d.key}" class="hora-badge hora-badge-${estado.cls}">${estado.label}</div>
+      </td>`;
+      return critCells+horaCell;
+    }).join('');
 
     // Weekly avg for this student
     const nums=[];
