@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conclusiones descriptivas — I.E. Nueva Esperanza</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--blue:#1A4E9A;--blue2:#2563B0;--bg:#F4F1EC;--line:#DDD8D0;--txt:#17150F;--mut:#6B6258;}
+body{font-family:'Plus Jakarta Sans',Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:14px;}
+.center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:#fff;border:1.5px solid var(--line);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.07);padding:24px;}
+.login{width:360px;max-width:100%;}
+.login h1{font-size:20px;color:var(--blue);margin-bottom:4px;}
+.muted{color:var(--mut);font-size:12px;}
+label{display:block;font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px;}
+select,input[type=password]{width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;}
+.btn{padding:10px 18px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;}
+.btn:hover{background:var(--blue2);}
+.btn:disabled{background:#aaa;cursor:not-allowed;}
+.btn.green{background:#1D6F42;}
+.btn.ghost{background:#fff;color:var(--blue);border:1.5px solid var(--blue);}
+.login .btn{width:100%;margin-top:16px;}
+.err{color:#9B1B1B;font-size:12px;font-weight:700;margin-top:10px;min-height:16px;}
+header{background:linear-gradient(135deg,#0D2F6E,#1A4E9A);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+header h1{font-size:16px;font-weight:800;}
+header .sp{flex:1;}
+header button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:7px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;}
+.wrap{max-width:1250px;margin:0 auto;padding:16px;}
+.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;}
+.controls .f{min-width:120px;}
+.controls .f label{margin-top:0;}
+.bims{display:flex;gap:6px;}
+.bim{padding:8px 14px;border:2px solid var(--line);background:#fff;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;color:var(--mut);}
+.bim.on{background:linear-gradient(135deg,#1A4E9A,#2563B0);color:#fff;border-color:var(--blue);}
+#status{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--blue);min-height:18px;}
+#status.bad{color:#9B1B1B;}
+.note{background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:10px;padding:10px 14px;font-size:12px;color:#7A5C0A;margin:12px 0;}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:12px 0;}
+.bar .f{min-width:240px;}
+.bar .f label{margin-top:0;}
+details{background:#fff;border:1.5px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+summary{padding:12px 16px;cursor:pointer;font-weight:800;display:flex;gap:10px;align-items:center;flex-wrap:wrap;list-style:none;}
+summary::-webkit-details-marker{display:none;}
+summary::before{content:'▸';color:var(--blue);}
+details[open] summary::before{content:'▾';}
+summary .meta{font-weight:600;font-size:12px;color:var(--mut);}
+.chips{margin-left:auto;display:flex;gap:5px;}
+.lv{display:inline-block;min-width:28px;text-align:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800;}
+.lvAD{background:#C8F0DC;color:#0A5C38;}.lvA{background:#C8DFF8;color:#0D3D80;}
+.lvB{background:#FEF0B0;color:#5A4000;}.lvC{background:#FAD0D0;color:#7A1010;}
+.comps{padding:0 16px 8px;font-size:12px;color:var(--mut);}
+.tbl{overflow-x:auto;padding:0 8px 12px;}
+table{border-collapse:collapse;width:100%;min-width:760px;}
+th{background:var(--blue);color:#fff;font-size:11px;padding:7px 8px;text-align:left;}
+td{border-bottom:1px solid #EEE9E0;padding:6px 8px;vertical-align:top;font-size:13px;}
+td.num{text-align:center;font-weight:800;font-family:monospace;}
+td.nm{font-weight:700;min-width:190px;}
+textarea{width:100%;min-width:380px;border:1.5px solid var(--line);border-radius:8px;padding:8px;font-family:inherit;font-size:12.5px;line-height:1.5;resize:vertical;}
+textarea:focus{outline:none;border-color:var(--blue2);}
+textarea.ed{background:#FFFBEB;border-color:#F59E0B;}
+.rg{border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:4px 7px;font-size:13px;}
+.rg:hover{background:#EFF6FF;}
+.cc{font-size:11px;margin-top:3px;}
+.star{color:#B45309;font-weight:800;font-size:11px;margin-left:3px;}
+</style>
+</head>
+<body>
+
+<div id="loginView" class="center">
+  <div class="card login">
+    <h1>Conclusiones descriptivas</h1>
+    <p class="muted">I.E.P. «La Nueva Esperanza» · Acceso exclusivo del Director</p>
+    <label>Director</label>
+    <select id="loginName"></select>
+    <label>PIN</label>
+    <input id="loginPin" type="password" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="loginMsg" class="err"></div>
+    <button class="btn" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<div id="mainView" style="display:none">
+  <header>
+    <h1>📝 Conclusiones descriptivas</h1>
+    <span class="sp"></span>
+    <span id="who" style="font-size:12px;"></span>
+    <button onclick="doLogout()">Salir</button>
+  </header>
+  <div class="wrap">
+    <div class="card">
+      <div class="controls">
+        <div class="f"><label>Grado</label><select id="selGrado"></select></div>
+        <div class="f"><label>Sección</label><select id="selSeccion"></select></div>
+        <div class="f"><label>Bimestre</label><div class="bims" id="bims"></div></div>
+        <button class="btn" id="btnLoad" onclick="loadAll()">🔄 Actualizar</button>
+      </div>
+    </div>
+    <div id="status"></div>
+    <div class="note">Las conclusiones se generan solas al elegir grado, sección y bimestre, a partir de las notas del registro (semanas, exposiciones y comportamiento, con el mismo cálculo del LOGRO; si el Director puso una nota manual, se usa esa). No se toma en cuenta el libro ni la evaluación bimestral. Son un <b>borrador</b>: cada docente debe revisarlos y ajustarlos antes de su uso oficial. <b>Las ediciones que hagas aquí no se guardan</b>: descarga el Excel antes de cambiar de grado, sección o bimestre.</div>
+    <div class="bar" id="bar" style="display:none">
+      <div class="f"><label>Curso</label><select id="courseFilter" onchange="renderResults()"></select></div>
+      <div class="f" style="min-width:200px"><label>Ver versión</label><select id="modeSel" onchange="setMode(this.value)"><option value="full">Completa</option><option value="short">Para SIAGIE (máx. 350 car.)</option></select></div>
+      <button class="btn green" id="btnXls" onclick="exportExcel()">⬇ Descargar Excel</button>
+      <button class="btn ghost" onclick="regenAll()">🔄 Variar redacción de todos</button>
+    </div>
+    <div id="results"></div>
+  </div>
+</div>
+
+<script>
+const SUPA_URL='https://qmiggagbafksstidzkoh.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtaWdnYWdiYWZrc3N0aWR6a29oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzMyMTUsImV4cCI6MjA4OTYwOTIxNX0.tnOsAL6Nl7tqMNuvY-JEv89NoUvGLs9itWjbBYNnMOg';
+const db=(typeof window!=='undefined'&&window.supabase)?window.supabase.createClient(SUPA_URL,SUPA_KEY):null;
+
+// ==PURE-START==
+const ALL_GRADOS=['3 Añitos','4 Añitos','5 Añitos','1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta'];
+const ALL_SECCIONES=['A','B','C','D','E','Única'];
+const BIMS=['I','II','III','IV'];
+
+// Competencias del CNEB (nombres oficiales) y capacidades en lenguaje descriptivo, por curso
+const K={
+ cant:'Resuelve problemas de cantidad',
+ reg:'Resuelve problemas de regularidad, equivalencia y cambio',
+ forma:'Resuelve problemas de forma, movimiento y localización',
+ datos:'Resuelve problemas de gestión de datos e incertidumbre',
+ oral:'Se comunica oralmente en su lengua materna',
+ lee:'Lee diversos tipos de textos escritos en su lengua materna',
+ escribe:'Escribe diversos tipos de textos en su lengua materna',
+ hist:'Construye interpretaciones históricas',
+ espacio:'Gestiona responsablemente el espacio y el ambiente',
+ ident:'Construye su identidad',
+ convive:'Convive y participa democráticamente en la búsqueda del bien común',
+ indaga:'Indaga mediante métodos científicos para construir sus conocimientos',
+ explica:'Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo',
+ tecno:'Diseña y construye soluciones tecnológicas para resolver problemas de su entorno',
+ aprecia:'Aprecia de manera crítica manifestaciones artístico-culturales',
+ crea:'Crea proyectos desde los lenguajes artísticos',
+ motric:'Se desenvuelve de manera autónoma a través de su motricidad',
+ salud:'Asume una vida saludable',
+ socio:'Interactúa a través de sus habilidades sociomotrices',
+ ingOral:'Se comunica oralmente en inglés como lengua extranjera',
+ ingLee:'Lee diversos tipos de textos escritos en inglés como lengua extranjera',
+ ingEsc:'Escribe diversos tipos de textos en inglés como lengua extranjera',
+ relId:'Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente',
+ relEnc:'Asume la experiencia del encuentro personal y comunitario con Dios en su proyecto de vida',
+ tic:'Se desenvuelve en los entornos virtuales generados por las TIC',
+ autonomo:'Gestiona su aprendizaje de manera autónoma'
+};
+const COURSES=[
+ {id:'mat',label:'Matemática',comps:[K.cant,K.reg,K.forma,K.datos],cap:'traducir situaciones a expresiones numéricas y algebraicas, representar formas y datos, y emplear estrategias para resolver problemas'},
+ {id:'com',label:'Comunicación',comps:[K.oral,K.lee,K.escribe],cap:'expresar sus ideas con claridad, comprender e interpretar textos escritos y redactar textos coherentes y bien organizados'},
+ {id:'ari',label:'Aritmética',comps:[K.cant],cap:'interpretar y representar cantidades, comprender las operaciones con números y emplear estrategias de cálculo y estimación'},
+ {id:'alg',label:'Álgebra',comps:[K.reg],cap:'generalizar patrones, plantear ecuaciones, inecuaciones y funciones, y emplear procedimientos algebraicos para resolver problemas'},
+ {id:'geo',label:'Geometría',comps:[K.forma],cap:'describir y representar formas geométricas, calcular perímetros, áreas y volúmenes, y ubicarse en el espacio'},
+ {id:'tri',label:'Trigonometría',comps:[K.forma],cap:'aplicar razones trigonométricas, resolver triángulos y usar propiedades geométricas en situaciones de medida y localización'},
+ {id:'his',label:'Historia',comps:[K.hist],cap:'interpretar fuentes históricas, comprender los cambios y permanencias en el tiempo y explicar procesos históricos'},
+ {id:'bio',label:'Biología',comps:[K.indaga,K.explica],cap:'explicar la estructura y el funcionamiento de los seres vivos, relacionar conceptos biológicos con su entorno y realizar indagaciones sencillas'},
+ {id:'geog',label:'Geografía',comps:[K.espacio],cap:'comprender las relaciones entre los elementos naturales y sociales del espacio geográfico, interpretar mapas y proponer acciones para cuidar el ambiente'},
+ {id:'ct',label:'Ciencia y Tecnología',comps:[K.indaga,K.explica,K.tecno],cap:'formular hipótesis y experimentar, explicar fenómenos del entorno con base científica y proponer soluciones tecnológicas'},
+ {id:'pl',label:'Plan Lector',comps:[K.lee],cap:'comprender las lecturas asignadas, inferir información y opinar de manera crítica sobre lo leído'},
+ {id:'rm',label:'Raz. Matemático',comps:[K.cant,K.reg],cap:'razonar lógicamente, identificar patrones y plantear estrategias para resolver situaciones problemáticas'},
+ {id:'rv',label:'Raz. Verbal',comps:[K.lee],cap:'ampliar su vocabulario, establecer relaciones entre palabras e ideas y comprender textos de distinta complejidad'},
+ {id:'ps',label:'Personal Social',comps:[K.ident,K.convive],cap:'reconocerse y valorarse como persona, respetar las normas de convivencia y participar con responsabilidad en su comunidad'},
+ {id:'arte',label:'Arte',comps:[K.aprecia,K.crea],cap:'valorar y comentar manifestaciones artísticas, experimentar con técnicas y materiales, y crear producciones con intención expresiva'},
+ {id:'ef',label:'Educación Física',comps:[K.motric,K.salud,K.socio],cap:'controlar y coordinar sus movimientos, practicar hábitos saludables y cooperar con sus compañeros en las actividades físicas'},
+ {id:'qui',label:'Química',comps:[K.indaga,K.explica],cap:'explicar las propiedades y transformaciones de la materia, resolver ejercicios aplicando conceptos químicos y realizar indagaciones con rigor'},
+ {id:'fis',label:'Física',comps:[K.indaga,K.explica],cap:'explicar fenómenos físicos, aplicar leyes y fórmulas para resolver problemas y realizar indagaciones con rigor'},
+ {id:'rob',label:'Robótica / IA',comps:[K.tecno,K.tic],cap:'diseñar, armar y programar prototipos para resolver problemas, trabajar en equipo y usar herramientas digitales con criterio'},
+ {id:'ing',label:'Inglés',comps:[K.ingOral,K.ingLee,K.ingEsc],cap:'comprender y expresar ideas en inglés, leer textos sencillos y redactar oraciones y párrafos con vocabulario y estructuras adecuadas'},
+ {id:'rel',label:'Religión / Tutoría',comps:[K.relId,K.relEnc],cap:'reconocer los valores cristianos, reflexionar sobre su proyecto de vida y practicar el respeto y la solidaridad con los demás'},
+ {id:'inf',label:'Informática',comps:[K.tic,K.autonomo],cap:'usar con criterio herramientas y programas informáticos, organizar y presentar información digital y trabajar con autonomía'},
+ {id:'mot',label:'Motricidad',comps:[K.motric],cap:'coordinar sus movimientos, conocer su cuerpo y desplazarse con seguridad y autonomía'},
+ {id:'lit',label:'Literatura',comps:[K.lee,K.escribe],cap:'comprender e interpretar textos literarios, reconocer recursos y géneros literarios y producir textos con intención creativa'},
+ {id:'len',label:'Lenguaje',comps:[K.escribe],cap:'emplear con corrección las normas gramaticales y ortográficas y redactar textos coherentes y cohesionados'}
+];
+const COURSE_BY_ID={}; COURSES.forEach(c=>COURSE_BY_ID[c.id]=c);
+
+// Misma escala que el registro
+function toLetter(v){
+  if(v===''||v===null||v===undefined) return '';
+  const n=parseFloat(v); if(isNaN(n)||n<0||n>20) return '';
+  if(n>=18) return 'AD'; if(n>=14) return 'A'; if(n>=11) return 'B'; return 'C';
+}
+function mean(a){ return a.length? a.reduce((x,y)=>x+y,0)/a.length : null; }
+function weekVals(row){
+  const out=[];
+  for(let s=1;s<=9;s++){
+    const raw=row['s'+s]; if(raw===''||raw===undefined||raw===null) continue;
+    const v=parseFloat(raw); if(!isNaN(v)) out.push({w:s,v});
+  }
+  return out;
+}
+function expVals(row){
+  const out=[];
+  ['ex1','ex2','ex3'].forEach(k=>{
+    const raw=row[k]; if(raw===''||raw===undefined||raw===null) return;
+    const v=parseFloat(raw); if(!isNaN(v)) out.push(v);
+  });
+  return out;
+}
+function courseHasNotes(snap){
+  return Object.values(snap||{}).some(r=>r&&typeof r==='object'&&(weekVals(r).length||expVals(r).length));
+}
+
+// Nota del estudiante: Semanas 40% + Exposiciones 30% + Comportamiento 5% (igual que el registro).
+// El libro y la evaluación bimestral NO entran. Si hay nota manual del Director, se usa esa.
+function computeStudent(row,compRaw,override){
+  row=row||{};
+  const wk=weekVals(row), ex=expVals(row);
+  const semAvg=mean(wk.map(x=>x.v)), expAvg=mean(ex);
+  const cpv=parseFloat(compRaw);
+  const cp=(compRaw===''||compRaw===null||compRaw===undefined||isNaN(cpv))?null:cpv;
+  let nota=null, manual=false;
+  if(override!==undefined&&override!==null&&override!==''&&!isNaN(Number(override))){
+    nota=Number(override); manual=true;
+  } else if(semAvg!==null||expAvg!==null){
+    let tw=0,tv=0;
+    if(semAvg!==null){tv+=semAvg*40;tw+=40;}
+    if(expAvg!==null){tv+=expAvg*30;tw+=30;}
+    if(cp!==null){tv+=cp*5;tw+=5;}
+    nota=Math.round((tv/tw)*10)/10;
+  }
+  if(nota===null||isNaN(nota)) return null;
+  return {nota,notaInt:Math.round(nota),nivel:toLetter(nota),manual,weeks:wk,expAvg,semAvg};
+}
+
+// ---- Redacción ----
+function hashStr(s){ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function pick(rng,arr){ return arr[Math.floor(rng()*arr.length)]; }
+function listComps(arr){
+  const q=arr.map(c=>'«'+c+'»');
+  if(q.length===1) return 'la competencia '+q[0];
+  return 'las competencias '+q.slice(0,-1).join(', ')+' y '+q[q.length-1];
+}
+function trendOf(weeks){
+  const n=weeks.length; if(n<3) return null;
+  const h=Math.floor(n/2);
+  const first=mean(weeks.slice(0,h).map(x=>x.v)), last=mean(weeks.slice(n-h).map(x=>x.v));
+  const diff=last-first;
+  const vals=weeks.map(x=>x.v), m=mean(vals);
+  const sd=Math.sqrt(vals.reduce((a,b)=>a+(b-m)*(b-m),0)/n);
+  if(diff>=1.5) return 'up';
+  if(diff<=-1.5) return 'down';
+  if(sd>=2.5) return 'irregular';
+  return 'stable';
+}
+const T_LEVEL={
+ AD:['Demuestra un desempeño destacado en {c}, superando el nivel esperado para su grado.','Evidencia un nivel de logro destacado en {c}, por encima de lo esperado en este bimestre.'],
+ A:['Logra el nivel esperado en {c}, evidenciando los aprendizajes previstos para el bimestre.','Alcanza los aprendizajes previstos en {c}, con un desempeño satisfactorio.'],
+ B:['Se encuentra en proceso de lograr {c}; está próximo al nivel esperado pero necesita acompañamiento.','Evidencia avances en {c}, aunque aún no alcanza el nivel esperado y requiere acompañamiento del docente.'],
+ C:['Se encuentra en inicio en {c}; presenta un progreso mínimo y requiere mayor tiempo de acompañamiento.','Muestra un progreso mínimo en {c} y necesita intervención y acompañamiento constante del docente.']
+};
+const T_CAP={
+ AD:['Es capaz de {k}, con autonomía y de manera argumentada.','Logra {k} con seguridad, precisión y autonomía.'],
+ A:['Es capaz de {k} de manera adecuada.','Logra {k} con un desempeño satisfactorio.'],
+ B:['Aún necesita fortalecer su capacidad para {k}.','Presenta dificultades parciales para {k}.'],
+ C:['Tiene dificultades para {k}.','Aún no logra {k} sin el apoyo del docente.']
+};
+const T_TREND={
+ up:['A lo largo del bimestre mostró una mejora progresiva en sus evaluaciones semanales.','Sus resultados semanales evidencian un avance sostenido durante el bimestre.','Se observa una evolución positiva en su desempeño de las últimas semanas.'],
+ down:['Sus resultados semanales disminuyeron hacia el final del bimestre, por lo que conviene reforzar su constancia.','Se observa un descenso en su rendimiento en las últimas semanas del bimestre.'],
+ irregular:['Sus resultados semanales fueron irregulares, alternando semanas de buen desempeño con otras de menor logro.','Presentó un rendimiento variable a lo largo del bimestre; necesita mayor constancia.'],
+ stableHigh:['Mantuvo un desempeño constante y sostenido durante todo el bimestre.','Se mostró estable y responsable en sus evaluaciones semanales.'],
+ stableLow:['Mantuvo un nivel similar durante el bimestre, sin avances notorios.','Sus resultados semanales se mantuvieron en un nivel parecido a lo largo del bimestre.']
+};
+const T_EXP={
+ high:['Participa con seguridad y claridad en las exposiciones y trabajos grupales.','Se desenvuelve bien en las exposiciones y trabajos grupales, comunicando sus ideas con claridad.'],
+ B:['Debe fortalecer la claridad y la seguridad en sus exposiciones y trabajos grupales.','En las exposiciones y trabajos grupales necesita mejorar la organización y la expresión de sus ideas.'],
+ C:['Requiere apoyo para participar y organizar sus ideas en las exposiciones y trabajos grupales.','Necesita acompañamiento para exponer sus ideas y participar en los trabajos grupales.']
+};
+const T_REC={
+ AD:['Se recomienda proponerle retos de mayor complejidad para seguir desarrollando su potencial.','Se sugiere asignarle actividades de profundización y fomentar que apoye a sus compañeros.','Se recomienda mantener su ritmo de trabajo y brindarle desafíos que amplíen sus aprendizajes.'],
+ A:['Se recomienda mantener su dedicación y reforzar los aspectos que le permitan alcanzar el nivel destacado.','Se sugiere continuar con la práctica constante para consolidar lo aprendido y avanzar al siguiente nivel.','Se recomienda seguir con el mismo compromiso y afianzar los temas de mayor dificultad.'],
+ B:['Se recomienda reforzar los aprendizajes con práctica adicional en casa y el acompañamiento del docente.','Se sugiere que el apoderado supervise el repaso de los temas trabajados y que participe en las actividades de refuerzo.','Se recomienda mayor constancia en el estudio y el aprovechamiento de las clases de reforzamiento.'],
+ C:['Se recomienda un plan de reforzamiento con acompañamiento permanente del docente y el apoyo constante de la familia.','Se sugiere atención personalizada, actividades de refuerzo y el compromiso del apoderado para el seguimiento diario.','Se recomienda una intervención oportuna con tutoría y refuerzo, y una comunicación frecuente con el apoderado.']
+};
+function genText(course,st,name,bim,bump){
+  const nivel=st.nivel||'B';
+  const rng=mulberry32((hashStr(name+'|'+course.id+'|'+bim)+(bump||0)*7919)>>>0);
+  const parts=[];
+  parts.push(pick(rng,T_LEVEL[nivel]).replace('{c}',listComps(course.comps)));
+  parts.push(pick(rng,T_CAP[nivel]).replace('{k}',course.cap));
+  const tr=trendOf(st.weeks||[]);
+  if(tr){
+    const key=tr==='stable'?((nivel==='AD'||nivel==='A')?'stableHigh':'stableLow'):tr;
+    parts.push(pick(rng,T_TREND[key]));
+  }
+  if(st.expAvg!==null&&st.expAvg!==undefined){
+    const el=toLetter(st.expAvg);
+    const ek=(el==='AD'||el==='A')?'high':(el==='B'?'B':'C');
+    parts.push(pick(rng,T_EXP[ek]));
+  }
+  parts.push(pick(rng,T_REC[nivel]));
+  return parts.join(' ');
+}
+// Síntesis para SIAGIE: máximo 350 caracteres
+const SIAGIE_MAX=350;
+const S_LEVEL={
+ AD:['Logra un nivel destacado en {l}, superando lo esperado.','Evidencia un desempeño destacado en {l}.'],
+ A:['Logra el nivel esperado en {l}.','Alcanza los aprendizajes previstos en {l}.'],
+ B:['Está en proceso de lograr lo esperado en {l}.','Evidencia avances en {l}, pero aún no alcanza lo esperado.'],
+ C:['Está en inicio en {l}, con un progreso mínimo.','Muestra un progreso mínimo en {l} y requiere acompañamiento.']
+};
+const S_TREND={
+ up:['Mejoró progresivamente durante el bimestre.','Muestra avance sostenido en el bimestre.'],
+ down:['Su rendimiento disminuyó hacia el final del bimestre.','Bajó su rendimiento en las últimas semanas.'],
+ irregular:['Su rendimiento fue irregular; necesita más constancia.','Alterna semanas de buen y bajo desempeño.'],
+ stableHigh:['Mantuvo un desempeño constante.','Se mostró estable y responsable.'],
+ stableLow:['']
+};
+const S_EXP={high:['Expone con seguridad.','Se desenvuelve bien en exposiciones.'],B:['Debe mejorar la claridad en sus exposiciones.'],C:['Requiere apoyo para exponer sus ideas.']};
+const S_REC={
+ AD:['Se sugiere proponerle retos de mayor complejidad.','Se recomienda ofrecerle actividades de profundización.'],
+ A:['Se recomienda afianzar los temas de mayor dificultad.','Se sugiere continuar con práctica constante.'],
+ B:['Se recomienda reforzar con práctica en casa y apoyo del docente.','Se sugiere repaso constante y asistencia a reforzamiento.'],
+ C:['Se recomienda plan de reforzamiento y apoyo constante de la familia.','Se sugiere atención personalizada y seguimiento diario del apoderado.']
+};
+function genShort(course,st,name,bim,bump){
+  const nivel=st.nivel||'B';
+  const rng=mulberry32((hashStr(name+'|'+course.id+'|'+bim+'|s')+(bump||0)*7919)>>>0);
+  const lvl=pick(rng,S_LEVEL[nivel]).replace('{l}',course.label);
+  const tr=trendOf(st.weeks||[]);
+  let trT='';
+  if(tr){ const key=tr==='stable'?((nivel==='AD'||nivel==='A')?'stableHigh':'stableLow'):tr; trT=pick(rng,S_TREND[key]); }
+  let exT='';
+  if(st.expAvg!==null&&st.expAvg!==undefined){ const el=toLetter(st.expAvg); exT=pick(rng,S_EXP[(el==='AD'||el==='A')?'high':(el==='B'?'B':'C')]); }
+  const rec=pick(rng,S_REC[nivel]);
+  // Se quitan partes opcionales si no cabe en 350 caracteres
+  const tries=[[lvl,trT,exT,rec],[lvl,trT,rec],[lvl,rec],[lvl]];
+  for(const t of tries){ const s=t.filter(Boolean).join(' '); if(s.length<=SIAGIE_MAX) return s; }
+  return lvl.slice(0,SIAGIE_MAX);
+}
+function buildCourseRows(course,snap,names,comp,overrides,bim){
+  const rows=[];
+  for(let idx=0;idx<names.length;idx++){
+    const name=names[idx];
+    if(!name||!String(name).trim()) continue;
+    const st=computeStudent((snap||{})[idx],(comp||{})[idx],(overrides||{})[idx]);
+    if(!st) continue;
+    const nm=String(name).trim();
+    rows.push({idx,name:nm,st,nota:st.notaInt,nivel:st.nivel,manual:st.manual,
+      bump:0,edited:false,text:genText(course,st,nm,bim,0),
+      short:genShort(course,st,nm,bim,0),editedShort:false});
+  }
+  return rows;
+}
+
+// ---- Excel (ExcelJS) ----
+function buildWorkbook(ExcelJS,meta,courses){
+  const wb=new ExcelJS.Workbook();
+  wb.creator='I.E.P. La Nueva Esperanza'; wb.created=new Date();
+  const used=new Set();
+  const FILL={AD:'FFC8F0DC',A:'FFC8DFF8',B:'FFFEF0B0',C:'FFFAD0D0'};
+  const thin={style:'thin',color:{argb:'FFB0C8E8'}};
+  const border={top:thin,left:thin,bottom:thin,right:thin};
+  courses.forEach(c=>{
+    let name=(c.label||'Curso').replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31)||'Curso';
+    const base=name; let k=2;
+    while(used.has(name.toLowerCase())){ name=base.slice(0,28)+' '+(k++); }
+    used.add(name.toLowerCase());
+    const ws=wb.addWorksheet(name,{
+      views:[{state:'frozen',ySplit:5}],
+      pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}
+    });
+    ws.columns=[{width:5},{width:34},{width:7},{width:8},{width:80},{width:58},{width:10}];
+    const line=(r,text,opt)=>{
+      ws.mergeCells('A'+r+':G'+r);
+      const cell=ws.getCell('A'+r); cell.value=text;
+      cell.font=Object.assign({name:'Calibri',size:11},opt.font||{});
+      cell.alignment={vertical:'middle',wrapText:true};
+      if(opt.h) ws.getRow(r).height=opt.h;
+    };
+    line(1,'I.E.P. «La Nueva Esperanza» — La Oroya   |   Conclusiones descriptivas — '+c.label+'   |   '+meta.grado+' Grado · Sección '+meta.seccion+' · Bimestre '+meta.bim,{font:{bold:true,size:12,color:{argb:'FF1A4E9A'}},h:24});
+    line(2,'Docente: '+(c.docente||'—'),{font:{bold:true},h:18});
+    line(3,'Competencias (CNEB): '+c.comps.join(' · '),{font:{size:10},h:32});
+    line(4,'Redacción generada a partir de las notas del registro (semanas, exposiciones y comportamiento). El docente debe revisarla y ajustarla antes de su uso oficial.',{font:{italic:true,size:9,color:{argb:'FF6B6258'}},h:16});
+    const hr=ws.getRow(5);
+    ['N°','Apellidos y nombres','Nota','Nivel','Conclusión descriptiva (completa)','Síntesis para SIAGIE (máx. 350 car.)','N° de caracteres'].forEach((t,i)=>{
+      const cell=hr.getCell(i+1); cell.value=t;
+      cell.font={bold:true,color:{argb:'FFFFFFFF'},name:'Calibri',size:11};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A4E9A'}};
+      cell.alignment={vertical:'middle',horizontal:(i===4||i===5||i===1)?'left':'center'};
+      cell.border=border;
+    });
+    hr.height=22;
+    c.rows.forEach((r,i)=>{
+      const row=ws.getRow(6+i);
+      row.getCell(1).value=i+1;
+      row.getCell(2).value=r.name;
+      row.getCell(3).value=r.nota;
+      row.getCell(4).value=r.nivel;
+      row.getCell(5).value=r.text;
+      row.getCell(6).value=r.short||'';
+      row.getCell(7).value={formula:'LEN(F'+(6+i)+')',result:(r.short||'').length};
+      for(let col=1;col<=7;col++){
+        const cell=row.getCell(col);
+        cell.border=border;
+        cell.font={name:'Calibri',size:(col===5||col===6)?10:11,bold:col===2||col===3||col===4};
+        cell.alignment={vertical:'top',wrapText:true,horizontal:(col===1||col===3||col===4||col===7)?'center':'left'};
+      }
+      if(FILL[r.nivel]){
+        row.getCell(3).fill={type:'pattern',pattern:'solid',fgColor:{argb:FILL[r.nivel]}};
+        row.getCell(4).fill={type:'pattern',pattern:'solid',fgColor:{argb:FILL[r.nivel]}};
+      }
+      row.height=Math.max(32,Math.ceil((r.text||'').length/90)*14+10);
+    });
+  });
+  return wb;
+}
+// ==PURE-END==
+
+// ======================= Pantalla =======================
+const $=id=>document.getElementById(id);
+const state={mode:'full',user:null,bim:'I',grado:'',seccion:'',names:[],courses:{},assign:{}};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function pj(s){try{return JSON.parse(s)||{};}catch(e){return {};}}
+function setStatus(msg,bad){const el=$('status');el.textContent=msg||'';el.className=bad?'bad':'';}
+
+async function initLogin(){
+  try{
+    const {data,error}=await db.from('docentes').select('nombre').eq('rol','director').order('nombre');
+    if(error) throw error;
+    if(!data||!data.length){ $('loginMsg').textContent='No hay cuentas de Director registradas.'; return; }
+    $('loginName').innerHTML=data.map(d=>'<option>'+esc(d.nombre)+'</option>').join('');
+    try{ const pre=sessionStorage.getItem('lne_dir'); if(pre&&data.some(d=>d.nombre===pre)){ $('loginName').value=pre; $('loginPin').focus(); } }catch(e){}
+  }catch(e){ $('loginMsg').textContent='No se pudo conectar: '+(e.message||e); }
+}
+async function doLogin(){
+  const nombre=$('loginName').value, pin=$('loginPin').value.trim();
+  const msg=t=>{$('loginMsg').textContent=t;};
+  if(!nombre||!pin){ msg('Selecciona tu nombre e ingresa tu PIN'); return; }
+  try{
+    const {data,error}=await db.from('docentes').select('nombre,rol').eq('nombre',nombre).eq('pin',pin).eq('rol','director').limit(1);
+    if(error) throw error;
+    if(!data||!data.length){ msg('PIN incorrecto'); return; }
+    state.user=data[0]; $('loginPin').value=''; msg('');
+    showMain();
+  }catch(e){ msg('Error: '+(e.message||e)); }
+}
+function doLogout(){
+  state.user=null; state.courses={}; state.names=[];
+  $('mainView').style.display='none'; $('loginView').style.display='flex';
+  $('results').innerHTML=''; $('bar').style.display='none'; setStatus('');
+}
+function showMain(){
+  $('loginView').style.display='none'; $('mainView').style.display='block';
+  $('who').textContent='👑 '+state.user.nombre;
+  if(!$('selGrado').options.length){
+    $('selGrado').innerHTML=ALL_GRADOS.map(g=>'<option>'+esc(g)+'</option>').join('');
+    $('selGrado').value='1°';
+    $('selSeccion').innerHTML=ALL_SECCIONES.map(s=>'<option>'+esc(s)+'</option>').join('');
+    $('selSeccion').value='Única';
+    // Contexto enviado desde el registro (?g=&s=&b=)
+    let auto=false;
+    try{
+      const qp=new URLSearchParams(location.search);
+      const g=qp.get('g'), s=qp.get('s'), b=qp.get('b');
+      if(g&&ALL_GRADOS.includes(g)){ $('selGrado').value=g; auto=true; }
+      if(s&&ALL_SECCIONES.includes(s)) $('selSeccion').value=s;
+      if(b&&BIMS.includes(b)) state.bim=b;
+    }catch(e){}
+    $('bims').innerHTML=BIMS.map(b=>'<button class="bim'+(b===state.bim?' on':'')+'" data-b="'+b+'" onclick="setBim(\''+b+'\')">'+b+'</button>').join('');
+    $('selGrado').onchange=$('selSeccion').onchange=()=>loadAll();
+  }
+  loadAll();
+}
+function setBim(b){
+  state.bim=b;
+  document.querySelectorAll('#bims .bim').forEach(x=>x.classList.toggle('on',x.dataset.b===b));
+  if(state.user) loadAll();
+}
+function latest(rows){
+  return (rows||[]).slice().sort((a,b)=>String(a.updated_at||'').localeCompare(String(b.updated_at||''))).pop();
+}
+
+async function loadAll(){
+  if(!state.user) return;
+  const grado=$('selGrado').value, seccion=$('selSeccion').value, bim=state.bim;
+  $('btnLoad').disabled=true; setStatus('Cargando notas de '+grado+' · Sección '+seccion+' · Bimestre '+bim+'…');
+  try{
+    const logroIds=COURSES.map(c=>'logro_'+grado+'_'+seccion+'_'+bim+'_'+c.id);
+    const [namesRes,snapsRes,assignRes,logroRes]=await Promise.all([
+      db.from('registros').select('estudiante_nombre,updated_at').eq('grado',grado).eq('seccion',seccion).eq('bimestre','all').eq('curso_id','_names').eq('columna_key','snapshot'),
+      db.from('registros').select('curso_id,estudiante_nombre,updated_at').eq('grado',grado).eq('seccion',seccion).eq('bimestre',bim).eq('columna_key','snapshot'),
+      db.from('configuracion').select('valor').eq('id','assign_'+grado+'_'+seccion).maybeSingle(),
+      db.from('configuracion').select('id,valor').in('id',logroIds)
+    ]);
+    [namesRes,snapsRes,assignRes,logroRes].forEach(r=>{ if(r.error) throw new Error(r.error.message); });
+
+    const nm=latest(namesRes.data);
+    const names=nm?(pj(nm.estudiante_nombre).names||[]):[];
+    const named=names.filter(n=>n&&String(n).trim()).length;
+    if(!named){
+      state.names=[]; state.courses={}; state.assign={};
+      renderResults(); $('bar').style.display='none';
+      setStatus('No hay estudiantes registrados en '+grado+' · Sección '+seccion+'.',true);
+      return;
+    }
+    const byCourse={};
+    (snapsRes.data||[]).forEach(r=>{ (byCourse[r.curso_id]=byCourse[r.curso_id]||[]).push(r); });
+    const comp=byCourse['_comportamiento']?pj(latest(byCourse['_comportamiento']).estudiante_nombre):{};
+    const overridesByCourse={};
+    (logroRes.data||[]).forEach(r=>{ overridesByCourse[r.id]=pj(r.valor); });
+
+    const courses={}; let total=0;
+    COURSES.forEach(c=>{
+      const rec=byCourse[c.id]; if(!rec) return;
+      const snap=pj(latest(rec).estudiante_nombre);
+      const ov=overridesByCourse['logro_'+grado+'_'+seccion+'_'+bim+'_'+c.id]||{};
+      if(!courseHasNotes(snap)&&!Object.keys(ov).length) return;
+      const rows=buildCourseRows(c,snap,names,comp,ov,bim);
+      if(rows.length){ courses[c.id]={rows}; total+=rows.length; }
+    });
+    state.grado=grado; state.seccion=seccion; state.names=names; state.courses=courses;
+    state.assign=assignRes.data?pj(assignRes.data.valor):{};
+
+    const ids=COURSES.filter(c=>courses[c.id]).map(c=>c.id);
+    if(!ids.length){
+      renderResults(); $('bar').style.display='none';
+      setStatus('No hay notas registradas en '+grado+' · Sección '+seccion+' · Bimestre '+bim+'.',true);
+      return;
+    }
+    $('courseFilter').innerHTML='<option value="all">Todos los cursos ('+ids.length+')</option>'+ids.map(i=>'<option value="'+i+'">'+esc(COURSE_BY_ID[i].label)+'</option>').join('');
+    $('bar').style.display='flex';
+    renderResults();
+    setStatus('✓ '+total+' conclusiones en '+ids.length+' cursos. Revisa o edita los textos y descarga el Excel.');
+  }catch(e){
+    console.error(e); setStatus('❌ No se pudo cargar: '+(e.message||e),true);
+  }finally{ $('btnLoad').disabled=false; }
+}
+
+function renderResults(){
+  const cont=$('results');
+  const ids=COURSES.filter(c=>state.courses[c.id]).map(c=>c.id);
+  if(!ids.length){ cont.innerHTML=''; return; }
+  const f=$('courseFilter').value||'all';
+  const show=f==='all'?ids:ids.filter(i=>i===f);
+  $('btnXls').textContent=f==='all'?'⬇ Descargar Excel (todos los cursos)':'⬇ Descargar Excel ('+COURSE_BY_ID[f].label+')';
+  cont.innerHTML=show.map(cid=>courseBlock(cid,f!=='all')).join('');
+}
+function courseBlock(cid,open){
+  const c=COURSE_BY_ID[cid], d=state.courses[cid];
+  const cnt={AD:0,A:0,B:0,C:0};
+  d.rows.forEach(r=>{ if(cnt[r.nivel]!==undefined) cnt[r.nivel]++; });
+  const doc=state.assign[cid]||'sin docente asignado';
+  const chips=['AD','A','B','C'].map(l=>cnt[l]?'<span class="lv lv'+l+'">'+l+' '+cnt[l]+'</span>':'').join('');
+  const rows=d.rows.map((r,i)=>
+    '<tr><td class="num">'+(i+1)+'</td><td class="nm">'+esc(r.name)+'</td>'+
+    '<td class="num">'+r.nota+(r.manual?'<span class="star" title="Nota manual del Director">*</span>':'')+'</td>'+
+    '<td class="num"><span class="lv lv'+r.nivel+'">'+r.nivel+'</span></td>'+
+    '<td><textarea id="t_'+cid+'_'+r.idx+'" class="'+(curEdited(r)?'ed':'')+'" rows="'+Math.max(3,Math.ceil(curText(r).length/95))+'" oninput="onEdit(\''+cid+'\','+r.idx+',this)">'+esc(curText(r))+'</textarea>'+
+      (state.mode==='short'?'<div class="cc" id="cc_'+cid+'_'+r.idx+'">'+ccLabel(curText(r))+'</div>':'')+'</td>'+
+    '<td><button class="rg" title="Otra redacción para este estudiante" onclick="regenRow(\''+cid+'\','+r.idx+')">🔄</button></td></tr>'
+  ).join('');
+  return '<details'+(open?' open':'')+'><summary>'+esc(c.label)+
+    '<span class="meta">'+d.rows.length+' estudiantes · Docente: '+esc(doc)+'</span><span class="chips">'+chips+'</span></summary>'+
+    '<div class="comps"><b>Competencias:</b> '+esc(c.comps.join(' · '))+'</div>'+
+    '<div class="tbl"><table><thead><tr><th style="width:36px">N°</th><th>Estudiante</th><th style="width:56px;text-align:center">Nota</th><th style="width:56px;text-align:center">Nivel</th><th>'+(state.mode==='short'?'Síntesis para SIAGIE':'Conclusión descriptiva')+'</th><th style="width:40px"></th></tr></thead><tbody>'+rows+'</tbody></table></div></details>';
+}
+function curText(r){ return state.mode==='short'?r.short:r.text; }
+function curEdited(r){ return state.mode==='short'?r.editedShort:r.edited; }
+function ccLabel(t){ const n=t.length; return '<span style="color:'+(n>SIAGIE_MAX?'#9B1B1B':'#6B6258')+';font-weight:700">'+n+' / '+SIAGIE_MAX+' caracteres'+(n>SIAGIE_MAX?' — excede el límite de SIAGIE':'')+'</span>'; }
+function setMode(m){ state.mode=m; renderResults(); }
+function findRow(cid,idx){ return state.courses[cid].rows.find(r=>r.idx===idx); }
+function onEdit(cid,idx,el){
+  const r=findRow(cid,idx); if(!r) return;
+  if(state.mode==='short'){ r.short=el.value; r.editedShort=true; const cc=$('cc_'+cid+'_'+idx); if(cc) cc.innerHTML=ccLabel(el.value); }
+  else { r.text=el.value; r.edited=true; }
+  el.classList.add('ed');
+  el.rows=Math.max(3,Math.ceil(el.value.length/95));
+}
+function regenRow(cid,idx){
+  const r=findRow(cid,idx); if(!r) return;
+  if(curEdited(r)&&!confirm('Este texto fue editado. ¿Reemplazarlo por una nueva redacción?')) return;
+  r.bump++;
+  if(state.mode==='short'){ r.editedShort=false; r.short=genShort(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump); }
+  else { r.edited=false; r.text=genText(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump); }
+  renderResults();
+}
+function regenAll(){
+  let anyEdited=false;
+  Object.values(state.courses).forEach(c=>c.rows.forEach(r=>{ if(r.edited||r.editedShort) anyEdited=true; }));
+  if(!confirm(anyEdited?'Hay textos editados que se perderán. ¿Generar una nueva redacción para todos?':'¿Generar una nueva redacción para todos los estudiantes?')) return;
+  Object.keys(state.courses).forEach(cid=>state.courses[cid].rows.forEach(r=>{
+    r.bump++; r.edited=false; r.editedShort=false; r.text=genText(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump); r.short=genShort(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump);
+  }));
+  renderResults();
+}
+async function exportExcel(){
+  const f=$('courseFilter').value||'all';
+  const ids=COURSES.filter(c=>state.courses[c.id]).map(c=>c.id).filter(i=>f==='all'||i===f);
+  if(!ids.length){ alert('No hay datos para descargar'); return; }
+  if(typeof ExcelJS==='undefined'){ alert('No se pudo cargar la librería de Excel. Revisa tu conexión y recarga la página.'); return; }
+  const meta={grado:state.grado,seccion:state.seccion,bim:state.bim};
+  const courses=ids.map(cid=>({
+    label:COURSE_BY_ID[cid].label, comps:COURSE_BY_ID[cid].comps,
+    docente:state.assign[cid]||'', rows:state.courses[cid].rows
+  }));
+  try{
+    const wb=buildWorkbook(ExcelJS,meta,courses);
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const clean=s=>String(s).replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ]+/g,'_').replace(/^_|_$/g,'');
+    const fname='Conclusiones_'+clean(meta.grado)+'_'+clean(meta.seccion)+'_Bim'+meta.bim+(f==='all'?'':'_'+clean(COURSE_BY_ID[f].label))+'.xlsx';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){ console.error(e); alert('Error al generar el Excel: '+(e.message||e)); }
+}
+
+if(db) initLogin();
+</script>
+</body>
+</html>
