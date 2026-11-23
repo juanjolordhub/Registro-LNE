@@ -65,6 +65,18 @@ textarea.ed{background:#FFFBEB;border-color:#F59E0B;}
 .rg{border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:4px 7px;font-size:13px;}
 .rg:hover{background:#EFF6FF;}
 .cc{font-size:11px;margin-top:3px;}
+.ai{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.hint{flex:1;min-width:220px;border:1.5px dashed var(--line);border-radius:8px;padding:6px 9px;font-size:12px;font-family:inherit;}
+.hint:focus{outline:none;border-color:#7C3AED;}
+.btn-ai{border:none;background:linear-gradient(135deg,#7C3AED,#2563B0);color:#fff;font-weight:800;font-size:12px;border-radius:8px;padding:7px 12px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.btn-ai:disabled{opacity:.6;cursor:wait;}
+.aimsg{font-size:11px;margin-top:3px;font-weight:700;}
+.aimsg.ok{color:#1D6F42;}.aimsg.warn{color:#B45309;}.aimsg.err{color:#9B1B1B;}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center;padding:16px;}
+.mbox{width:520px;max-width:100%;}
+.mbox h2{font-size:17px;color:var(--blue);}
+.mbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.mbtns .btn{padding:8px 14px;}
 .star{color:#B45309;font-weight:800;font-size:11px;margin-left:3px;}
 </style>
 </head>
@@ -88,6 +100,7 @@ textarea.ed{background:#FFFBEB;border-color:#F59E0B;}
     <h1>📝 Conclusiones descriptivas</h1>
     <span class="sp"></span>
     <span id="who" style="font-size:12px;"></span>
+    <button onclick="openSettings()" title="Configurar la clave de Google Gemini">⚙️ IA</button>
     <button onclick="doLogout()">Salir</button>
   </header>
   <div class="wrap">
@@ -100,14 +113,33 @@ textarea.ed{background:#FFFBEB;border-color:#F59E0B;}
       </div>
     </div>
     <div id="status"></div>
-    <div class="note">Las conclusiones se generan solas al elegir grado, sección y bimestre, a partir de las notas del registro (semanas, exposiciones y comportamiento, con el mismo cálculo del LOGRO; si el Director puso una nota manual, se usa esa). No se toma en cuenta el libro ni la evaluación bimestral. Son un <b>borrador</b>: cada docente debe revisarlos y ajustarlos antes de su uso oficial. <b>Las ediciones que hagas aquí no se guardan</b>: descarga el Excel antes de cambiar de grado, sección o bimestre.</div>
+    <div class="note">Las conclusiones se generan solas, <b>una por cada competencia</b> del curso, a partir de las notas del registro (semanas, exposiciones y comportamiento, con el mismo cálculo del LOGRO; si el Director puso una nota manual, se usa esa). No se toma en cuenta el libro ni la evaluación bimestral. Son un <b>borrador</b>: cada docente debe revisarlas y ajustarlas. Con <b>✨ Mejorar con IA</b> (Google Gemini) puedes reescribir una conclusión; solo se envían el curso, la competencia, el nivel y las notas, <b>nunca el nombre del estudiante</b>. <b>Las ediciones que hagas aquí no se guardan</b>: descarga el Excel antes de cambiar de grado, sección o bimestre.</div>
     <div class="bar" id="bar" style="display:none">
-      <div class="f"><label>Curso</label><select id="courseFilter" onchange="renderResults()"></select></div>
-      <div class="f" style="min-width:200px"><label>Ver versión</label><select id="modeSel" onchange="setMode(this.value)"><option value="full">Completa</option><option value="short">Para SIAGIE (máx. 350 car.)</option></select></div>
+      <div class="f"><label>Curso</label><select id="courseFilter" onchange="onCourseChange()"></select></div>
+      <div class="f" id="compWrap" style="min-width:280px;display:none"><label>Competencia</label><select id="compFilter" onchange="renderResults()"></select></div>
+      <div class="f" style="min-width:200px"><label>Ver versión</label><select id="modeSel" onchange="setMode(this.value)"><option value="short">Para SIAGIE (máx. 350 car.)</option><option value="full">Completa</option></select></div>
       <button class="btn green" id="btnXls" onclick="exportExcel()">⬇ Descargar Excel</button>
       <button class="btn ghost" onclick="regenAll()">🔄 Variar redacción de todos</button>
     </div>
     <div id="results"></div>
+  </div>
+</div>
+
+<div id="modal" class="modal" style="display:none" onclick="if(event.target===this)closeSettings()">
+  <div class="card mbox">
+    <h2>⚙️ Clave de Google Gemini (gratuita)</h2>
+    <p class="muted" style="margin:6px 0 10px">Se usa solo para el botón ✨ Mejorar con IA. Consíguela gratis en <b>aistudio.google.com/apikey</b> (inicia sesión con tu cuenta de Google y pulsa «Create API key»). La clave se guarda solo en este navegador, no en el código ni en la base de datos.</p>
+    <label>Tu clave de API</label>
+    <input id="keyInput" type="password" autocomplete="off" placeholder="Pega aquí tu clave (empieza con AIza…)">
+    <div id="keyState" class="muted" style="margin-top:8px"></div>
+    <div id="keyMsg" class="err" style="min-height:18px"></div>
+    <div class="mbtns">
+      <button class="btn" onclick="saveKey()">Guardar</button>
+      <button class="btn ghost" onclick="testKey()">Probar conexión</button>
+      <button class="btn ghost" onclick="deleteKey()">Eliminar clave</button>
+      <button class="btn ghost" onclick="closeSettings()">Cerrar</button>
+    </div>
+    <p class="muted" style="margin-top:10px">Nota: en el plan gratuito, Google puede usar lo que se envía para mejorar sus productos. Por eso la página nunca envía nombres de estudiantes.</p>
   </div>
 </div>
 
@@ -120,66 +152,225 @@ const db=(typeof window!=='undefined'&&window.supabase)?window.supabase.createCl
 const ALL_GRADOS=['3 Añitos','4 Añitos','5 Añitos','1°','2°','3°','4°','5°','6°','Alfa','Beta','Gamma','Delta'];
 const ALL_SECCIONES=['A','B','C','D','E','Única'];
 const BIMS=['I','II','III','IV'];
+const SIAGIE_MAX=350, SIAGIE_MIN_OBJ=315, SIAGIE_MAX_OBJ=340;
 
-// Competencias del CNEB (nombres oficiales) y capacidades en lenguaje descriptivo, por curso
-const K={
- cant:'Resuelve problemas de cantidad',
- reg:'Resuelve problemas de regularidad, equivalencia y cambio',
- forma:'Resuelve problemas de forma, movimiento y localización',
- datos:'Resuelve problemas de gestión de datos e incertidumbre',
- oral:'Se comunica oralmente en su lengua materna',
- lee:'Lee diversos tipos de textos escritos en su lengua materna',
- escribe:'Escribe diversos tipos de textos en su lengua materna',
- hist:'Construye interpretaciones históricas',
- espacio:'Gestiona responsablemente el espacio y el ambiente',
- ident:'Construye su identidad',
- convive:'Convive y participa democráticamente en la búsqueda del bien común',
- indaga:'Indaga mediante métodos científicos para construir sus conocimientos',
- explica:'Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo',
- tecno:'Diseña y construye soluciones tecnológicas para resolver problemas de su entorno',
- aprecia:'Aprecia de manera crítica manifestaciones artístico-culturales',
- crea:'Crea proyectos desde los lenguajes artísticos',
- motric:'Se desenvuelve de manera autónoma a través de su motricidad',
- salud:'Asume una vida saludable',
- socio:'Interactúa a través de sus habilidades sociomotrices',
- ingOral:'Se comunica oralmente en inglés como lengua extranjera',
- ingLee:'Lee diversos tipos de textos escritos en inglés como lengua extranjera',
- ingEsc:'Escribe diversos tipos de textos en inglés como lengua extranjera',
- relId:'Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente',
- relEnc:'Asume la experiencia del encuentro personal y comunitario con Dios en su proyecto de vida',
- tic:'Se desenvuelve en los entornos virtuales generados por las TIC',
- autonomo:'Gestiona su aprendizaje de manera autónoma'
+// ---------- Competencias del CNEB (nombres oficiales) con banco de desempeños ----------
+// skills: desempeños concretos (verbo en infinitivo) · hard: dificultades · act: acciones prácticas · fam: apoyo familiar
+const COMP={
+ cant:{name:'Resuelve problemas de cantidad',
+  skills:['resolver problemas de compra y venta con números naturales','comparar y ordenar cantidades y expresarlas de distintas formas','realizar operaciones de suma, resta, multiplicación y división con precisión','elegir estrategias de cálculo para resolver situaciones cotidianas','explicar el procedimiento que usó para llegar a su resultado'],
+  hard:['comprender el enunciado de los problemas','aplicar con exactitud las operaciones','elegir la estrategia adecuada para resolver','justificar sus resultados'],
+  act:['practicar a diario problemas de compras y vueltos con material concreto','repasar las tablas de multiplicar con juegos breves','resolver dos problemas al día explicando los pasos en voz alta','usar monedas o regletas para representar las cantidades'],
+  fam:['proponerle situaciones de compra y vuelto en casa','revisar con él o ella las operaciones de sus tareas','jugar a cálculos mentales de manera breve y diaria']},
+ reg:{name:'Resuelve problemas de regularidad, equivalencia y cambio',
+  skills:['descubrir patrones y continuar secuencias numéricas y gráficas','plantear igualdades y ecuaciones sencillas','representar relaciones de cambio mediante tablas y expresiones','hallar valores desconocidos con distintas estrategias','explicar la regla que sigue un patrón'],
+  hard:['identificar la regla de formación de un patrón','plantear la ecuación que representa el problema','interpretar tablas y relaciones de cambio','justificar la equivalencia entre expresiones'],
+  act:['completar a diario secuencias y patrones con material concreto','plantear una ecuación sencilla por semana a partir de situaciones reales','crear sus propios patrones con figuras y números','representar los problemas en tablas antes de resolverlos'],
+  fam:['proponerle patrones con objetos del hogar','pedirle que explique cómo halló el valor desconocido','jugar con él o ella a adivinar reglas de secuencias']},
+ forma:{name:'Resuelve problemas de forma, movimiento y localización',
+  skills:['describir y reconocer figuras y cuerpos geométricos','medir longitudes, perímetros y áreas con unidades adecuadas','ubicarse y desplazarse en el plano con coordenadas y mapas','realizar transformaciones como giros y simetrías','relacionar las formas geométricas con objetos de su entorno'],
+  hard:['diferenciar las propiedades de las figuras','calcular perímetros y áreas con exactitud','usar con precisión los instrumentos de medida','ubicar posiciones en el plano'],
+  act:['medir objetos de casa con regla y cinta métrica','dibujar y recortar figuras para comparar sus propiedades','armar el plano sencillo de su cuarto o de su colegio','practicar el uso correcto de regla y transportador'],
+  fam:['pedirle que mida y describa objetos del hogar','jugar a ubicar lugares en mapas y planos sencillos','revisar con él o ella el trazo de sus figuras']},
+ datos:{name:'Resuelve problemas de gestión de datos e incertidumbre',
+  skills:['organizar datos en tablas y gráficos de barras','interpretar gráficos y tablas para tomar decisiones','calcular la moda, la media y otras medidas','decidir si un suceso es seguro, posible o imposible','responder preguntas a partir de la información de un gráfico'],
+  hard:['leer e interpretar gráficos','organizar los datos de forma ordenada','calcular medidas como la moda o el promedio','justificar sus conclusiones con los datos'],
+  act:['elaborar encuestas cortas y graficar sus resultados','interpretar gráficos de periódicos o revistas','registrar datos de su entorno en tablas','explicar con sus palabras lo que muestra un gráfico'],
+  fam:['proponerle encuestas sencillas entre familiares','comentar con él o ella los gráficos que vea en las noticias','jugar con dados y monedas para predecir resultados']},
+ oral:{name:'Se comunica oralmente en su lengua materna',
+  skills:['expresar sus ideas con claridad y orden al hablar','escuchar con atención y responder a lo que dicen los demás','adecuar su voz, gestos y vocabulario a la situación','explicar y opinar sobre temas de su entorno','participar en diálogos y exposiciones respetando los turnos'],
+  hard:['organizar sus ideas al exponer','hablar con volumen y seguridad','usar un vocabulario variado y pertinente','mantener el tema en sus intervenciones'],
+  act:['exponer cada semana un tema breve ante su familia','ensayar frente al espejo con ideas clave','narrar en voz alta lo leído o vivido cada día','grabarse en audio y escucharse para mejorar'],
+  fam:['pedirle que cuente cada día cómo le fue en el colegio','escuchar sus exposiciones y darle sugerencias amables','conversar con él o ella sobre temas de su interés']},
+ lee:{name:'Lee diversos tipos de textos escritos en su lengua materna',
+  skills:['comprender textos de distinto tipo','localizar información explícita y deducir ideas implícitas','identificar el tema central y las ideas principales','opinar con argumentos sobre lo que lee','leer con fluidez y entonación adecuadas'],
+  hard:['deducir información que no está explícita','identificar la idea principal','leer con fluidez respetando los signos de puntuación','sustentar su opinión con ideas del texto'],
+  act:['leer veinte minutos al día y comentar lo leído','subrayar las ideas principales y resumirlas con sus palabras','responder preguntas antes, durante y después de leer','elegir lecturas de su interés y compartirlas'],
+  fam:['leer junto a él o ella y conversar sobre lo leído','visitar una biblioteca o intercambiar libros en casa','pedirle que resuma lo que leyó cada día']},
+ escribe:{name:'Escribe diversos tipos de textos en su lengua materna',
+  skills:['redactar textos coherentes y ordenados según su propósito','usar conectores y signos de puntuación con propiedad','aplicar las reglas ortográficas básicas','planificar y revisar sus textos antes de entregarlos','ampliar sus ideas con vocabulario variado'],
+  hard:['ordenar sus ideas al escribir','aplicar las reglas de ortografía y puntuación','usar conectores para dar cohesión','revisar y corregir su propio texto'],
+  act:['escribir un párrafo breve cada día sobre un tema de su interés','consultar el diccionario para revisar su ortografía','reescribir sus textos corrigiendo los errores señalados','llevar un diario personal con oraciones completas'],
+  fam:['pedirle que escriba notas o mensajes breves en casa','revisar con él o ella la ortografía de sus escritos','leer sus textos y felicitar cada mejora']},
+ hist:{name:'Construye interpretaciones históricas',
+  skills:['ordenar hechos históricos en el tiempo','explicar causas y consecuencias de los procesos históricos','analizar fuentes para obtener información del pasado','reconocer cambios y permanencias en su comunidad','relacionar el pasado con su vida actual'],
+  hard:['ordenar los hechos en una secuencia temporal','distinguir causas y consecuencias','analizar fuentes históricas','explicar los cambios en el tiempo'],
+  act:['elaborar líneas de tiempo con imágenes y fechas','entrevistar a un familiar mayor sobre hechos de su comunidad','comparar dos fuentes sobre un mismo hecho','resumir cada tema con un esquema de causas y consecuencias'],
+  fam:['conversar con él o ella sobre la historia de su familia','visitar museos o lugares históricos cercanos','pedirle que cuente lo aprendido como si fuera una historia']},
+ espacio:{name:'Gestiona responsablemente el espacio y el ambiente',
+  skills:['ubicar lugares en mapas y planos','reconocer los recursos naturales y la importancia de cuidarlos','explicar cómo las personas transforman el espacio donde viven','proponer acciones para cuidar el ambiente','identificar riesgos y medidas de prevención ante desastres'],
+  hard:['ubicar lugares en un mapa','relacionar los elementos naturales y sociales del espacio','explicar el impacto de las acciones humanas','proponer acciones de cuidado ambiental'],
+  act:['dibujar mapas de su barrio señalando lugares importantes','participar en acciones de reciclaje en casa y en el colegio','comparar mapas físicos y políticos de su región','elaborar un plan familiar de prevención ante riesgos'],
+  fam:['practicar con él o ella el reciclaje en el hogar','salir a conocer y cuidar espacios de la comunidad','revisar juntos mapas del Perú y de su región']},
+ ident:{name:'Construye su identidad',
+  skills:['reconocer sus cualidades, emociones y logros','expresar sus emociones de manera adecuada','valorar su historia familiar y cultural','actuar con autonomía y asumir responsabilidades','respetar las diferencias de sus compañeros'],
+  hard:['reconocer y regular sus emociones','asumir sus responsabilidades','valorar las diferencias de los demás','expresar lo que siente de manera respetuosa'],
+  act:['anotar cada día una emoción y cómo la manejó','asumir una responsabilidad fija en el aula','reconocer en voz alta un logro y una meta personal','dialogar sobre sus decisiones con ayuda del tutor'],
+  fam:['conversar a diario con él o ella sobre sus emociones','asignarle responsabilidades pequeñas en casa','reconocer sus esfuerzos y logros con palabras de aliento']},
+ convive:{name:'Convive y participa democráticamente en la búsqueda del bien común',
+  skills:['respetar las normas de convivencia del aula','trabajar en equipo escuchando otras opiniones','resolver conflictos mediante el diálogo','participar en acuerdos y asumir sus responsabilidades','proponer acciones para el bien común'],
+  hard:['respetar las normas de convivencia','trabajar en equipo con tolerancia','resolver conflictos sin agresión','asumir los acuerdos tomados'],
+  act:['asumir un rol en los trabajos grupales y cumplirlo','practicar el diálogo para resolver desacuerdos','proponer una acción solidaria para el aula','recordar y aplicar las normas acordadas con su grupo'],
+  fam:['reforzar en casa los acuerdos de convivencia','conversar con él o ella sobre cómo resolver conflictos','fomentar su participación en actividades solidarias']},
+ indaga:{name:'Indaga mediante métodos científicos para construir sus conocimientos',
+  skills:['formular preguntas e hipótesis sobre los fenómenos que observa','planificar y realizar experimentos sencillos','registrar y analizar los datos que obtiene','sacar conclusiones a partir de sus observaciones','comunicar los resultados de sus indagaciones'],
+  hard:['plantear hipótesis que puedan comprobarse','seguir los pasos del método científico','registrar con orden sus observaciones','explicar sus conclusiones con evidencias'],
+  act:['realizar en casa un experimento sencillo y anotar lo observado','registrar en un cuaderno las observaciones de la semana','escribir una pregunta y una posible respuesta antes de cada experimento','explicar a su familia lo que descubrió en cada práctica'],
+  fam:['acompañarle en experimentos sencillos con materiales del hogar','pedirle que explique qué observó y por qué ocurrió','animarle a hacerse preguntas sobre lo que ve a su alrededor']},
+ explica:{name:'Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo',
+  skills:['explicar con sus palabras los fenómenos naturales estudiados','relacionar los seres vivos con su ambiente','describir las propiedades de la materia y la energía','usar vocabulario científico adecuado','dar ejemplos de su entorno que ilustran lo aprendido'],
+  hard:['comprender los conceptos científicos','relacionar causas y efectos de los fenómenos','usar el vocabulario científico con precisión','dar ejemplos que sustenten sus explicaciones'],
+  act:['elaborar esquemas y mapas conceptuales de cada tema','repasar los conceptos con tarjetas de preguntas','buscar ejemplos del entorno que expliquen lo aprendido','explicar el tema del día a un familiar'],
+  fam:['conversar con él o ella sobre los fenómenos que ve en casa','revisar juntos sus esquemas y resúmenes','ver documentales breves y comentarlos en familia']},
+ tecno:{name:'Diseña y construye soluciones tecnológicas para resolver problemas de su entorno',
+  skills:['identificar un problema de su entorno y proponer una solución','diseñar y construir prototipos con materiales sencillos','probar su prototipo y mejorarlo','explicar cómo funciona su solución','trabajar en equipo durante la construcción'],
+  hard:['plantear una solución viable al problema','dibujar y planificar su prototipo','probar y mejorar su prototipo','explicar el funcionamiento de su diseño'],
+  act:['dibujar el diseño de su prototipo antes de construirlo','construir modelos sencillos con material reciclado','anotar qué falló en su prototipo y cómo mejorarlo','explicar a su familia cómo funciona su construcción'],
+  fam:['facilitarle materiales reciclables para sus prototipos','pedirle que explique cómo funciona lo que construyó','animarle a arreglar objetos simples del hogar']},
+ aprecia:{name:'Aprecia de manera crítica manifestaciones artístico-culturales',
+  skills:['describir y comentar obras y manifestaciones artísticas','reconocer las características de distintas expresiones artísticas','relacionar el arte con la cultura de su comunidad','opinar sobre las obras con respeto','identificar los elementos que usa el artista'],
+  hard:['describir con detalle una obra de arte','reconocer los elementos del lenguaje artístico','relacionar el arte con su contexto cultural','sustentar su opinión sobre una obra'],
+  act:['observar una obra cada semana y describir lo que ve','visitar con su familia exposiciones o ferias artesanales','comparar dos obras y explicar sus diferencias','conversar sobre las expresiones artísticas de su comunidad'],
+  fam:['visitar con él o ella museos o ferias artesanales','conversar sobre las obras o danzas que observan','mostrarle y comentar expresiones artísticas de su región']},
+ crea:{name:'Crea proyectos desde los lenguajes artísticos',
+  skills:['crear producciones artísticas con intención expresiva','experimentar con técnicas y materiales variados','combinar colores, formas y texturas','presentar sus trabajos con orden y creatividad','mejorar sus obras a partir de la revisión'],
+  hard:['expresar sus ideas mediante el arte','usar con cuidado las técnicas y materiales','organizar sus trabajos con limpieza y orden','mejorar su obra después de revisarla'],
+  act:['dedicar un momento semanal al dibujo o la pintura libre','probar una técnica nueva en cada trabajo','revisar su obra y mejorar un detalle antes de entregarla','organizar sus materiales para trabajar con orden'],
+  fam:['proveerle materiales sencillos para crear en casa','exhibir sus trabajos y comentarlos con él o ella','animarle a participar en actividades artísticas']},
+ motric:{name:'Se desenvuelve de manera autónoma a través de su motricidad',
+  skills:['coordinar sus movimientos con equilibrio y control','realizar desplazamientos, saltos y giros con seguridad','reconocer su cuerpo y sus posibilidades de movimiento','adaptar sus movimientos a juegos y ejercicios','seguir las consignas de las actividades físicas'],
+  hard:['coordinar sus movimientos','mantener el equilibrio','controlar sus desplazamientos y saltos','seguir las consignas de la actividad'],
+  act:['practicar a diario ejercicios de equilibrio y coordinación','jugar a saltar, correr y trepar con supervisión','repetir los ejercicios de la clase en casa','realizar juegos con pelota para mejorar su control'],
+  fam:['jugar con él o ella a actividades de movimiento','promover caminatas y juegos al aire libre','acompañarle en la práctica de los ejercicios de clase']},
+ salud:{name:'Asume una vida saludable',
+  skills:['practicar hábitos de higiene y alimentación saludable','reconocer la importancia de la actividad física','realizar el calentamiento y los ejercicios con seguridad','cuidar su cuerpo después del esfuerzo','explicar cómo mejorar su salud con hábitos diarios'],
+  hard:['practicar hábitos saludables de manera constante','realizar el calentamiento antes de la actividad','reconocer los efectos del ejercicio en su cuerpo','elegir alimentos saludables'],
+  act:['cumplir cada día con un momento de actividad física','llevar una lonchera saludable al colegio','hacer su calentamiento antes de cada actividad','registrar sus hábitos de higiene y alimentación'],
+  fam:['preparar con él o ella loncheras saludables','fomentar la actividad física en familia','reforzar en casa los hábitos de higiene y descanso']},
+ socio:{name:'Interactúa a través de sus habilidades sociomotrices',
+  skills:['trabajar en equipo respetando las reglas del juego','comunicarse y cooperar con sus compañeros','participar con deportividad','asumir distintos roles en los juegos','proponer estrategias para el equipo'],
+  hard:['respetar las reglas del juego','cooperar con todo su equipo','aceptar el resultado con deportividad','asumir su rol en la actividad'],
+  act:['participar en juegos de equipo cumpliendo su rol','practicar la comunicación con su grupo antes de cada juego','reconocer en voz alta el esfuerzo de sus compañeros','proponer una regla justa para el juego'],
+  fam:['conversar con él o ella sobre la deportividad','animarle a practicar deportes en equipo','reconocer su esfuerzo más que el resultado']},
+ ingOral:{name:'Se comunica oralmente en inglés como lengua extranjera',
+  skills:['comprender y responder saludos y preguntas sencillas en inglés','pronunciar con claridad el vocabulario aprendido','participar en diálogos cortos en inglés','describir objetos y rutinas en inglés','usar expresiones del aula en inglés'],
+  hard:['pronunciar con claridad el vocabulario','responder preguntas sencillas en inglés','participar en diálogos cortos','recordar el vocabulario aprendido'],
+  act:['repetir cada día diez palabras nuevas en voz alta','practicar diálogos cortos con un compañero o familiar','escuchar canciones en inglés y repetir las frases','usar tarjetas ilustradas para repasar el vocabulario'],
+  fam:['escuchar con él o ella canciones y videos breves en inglés','pedirle que diga en inglés los objetos de la casa','practicar saludos y preguntas sencillas en inglés']},
+ ingLee:{name:'Lee diversos tipos de textos escritos en inglés como lengua extranjera',
+  skills:['comprender textos breves en inglés','reconocer vocabulario y frases conocidas','identificar la idea principal de textos sencillos','relacionar imágenes con palabras en inglés','leer en voz alta con pronunciación adecuada'],
+  hard:['comprender textos breves en inglés','reconocer el vocabulario aprendido','identificar la idea principal','leer en voz alta con pronunciación adecuada'],
+  act:['leer cada día un texto corto en inglés y subrayar las palabras conocidas','armar un glosario con las palabras nuevas','leer cuentos breves ilustrados en inglés','relacionar palabras con imágenes en tarjetas'],
+  fam:['leer con él o ella cuentos breves en inglés','pegar rótulos en inglés en los objetos de la casa','revisar juntos su glosario de palabras nuevas']},
+ ingEsc:{name:'Escribe diversos tipos de textos en inglés como lengua extranjera',
+  skills:['escribir oraciones sencillas con el vocabulario aprendido','completar textos breves con estructuras correctas','usar la ortografía de las palabras en inglés','describir por escrito personas, lugares y rutinas','organizar sus ideas en párrafos cortos en inglés'],
+  hard:['escribir correctamente las palabras en inglés','construir oraciones con el orden adecuado','usar el vocabulario aprendido al escribir','organizar sus ideas en inglés'],
+  act:['escribir cada día tres oraciones en inglés sobre su rutina','copiar y corregir el vocabulario nuevo en su cuaderno','redactar una descripción breve de su familia en inglés','revisar la ortografía de sus textos antes de entregarlos'],
+  fam:['pedirle que escriba notas breves en inglés','revisar con él o ella el vocabulario de la semana','animarle a escribir su rutina diaria en inglés']},
+ relId:{name:'Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente',
+  skills:['reconocerse como persona valiosa, amada por Dios','valorar a los demás como hijos de Dios','practicar valores como el respeto y la solidaridad','reflexionar sobre sus acciones a la luz del Evangelio','expresar su fe de manera respetuosa'],
+  hard:['reconocer su propio valor como persona','practicar los valores trabajados en clase','reflexionar sobre sus acciones','respetar las creencias de los demás'],
+  act:['anotar cada día una buena acción realizada','reflexionar en familia sobre el valor de la semana','agradecer en voz alta algo bueno de su día','practicar un gesto de servicio con sus compañeros'],
+  fam:['conversar con él o ella sobre los valores del Evangelio','rezar o reflexionar juntos cada día','reconocer sus gestos de bondad en casa']},
+ relEnc:{name:'Asume la experiencia del encuentro personal y comunitario con Dios en su proyecto de vida',
+  skills:['participar con respeto en momentos de oración y reflexión','relacionar los relatos bíblicos con su vida diaria','reconocer las enseñanzas de Jesús','asumir compromisos de servicio a su comunidad','expresar con sus palabras lo que aprende de la Biblia'],
+  hard:['participar con atención en la oración','relacionar los relatos bíblicos con su vida','recordar las enseñanzas de Jesús','cumplir sus compromisos de servicio'],
+  act:['leer un pasaje bíblico breve y comentar su mensaje','participar en un gesto solidario cada mes','elaborar un compromiso personal semanal','dibujar o resumir la enseñanza de cada relato bíblico'],
+  fam:['leer con él o ella pasajes bíblicos sencillos','participar juntos en actividades de su comunidad de fe','conversar sobre cómo aplicar lo aprendido en casa']},
+ tic:{name:'Se desenvuelve en los entornos virtuales generados por las TIC',
+  skills:['usar con responsabilidad las herramientas digitales','crear y organizar archivos y documentos digitales','buscar y seleccionar información confiable en internet','presentar sus trabajos con programas informáticos','cuidar su seguridad al usar internet'],
+  hard:['usar con soltura el teclado y el mouse','organizar sus archivos digitales','seleccionar información confiable','presentar sus trabajos con programas informáticos'],
+  act:['practicar a diario el uso del teclado con ejercicios breves','guardar y ordenar sus archivos en carpetas','comparar dos fuentes digitales antes de usar una información','crear una presentación breve sobre un tema de clase'],
+  fam:['supervisar con él o ella el uso responsable de internet','darle acceso a un equipo para practicar sus tareas','conversar sobre la seguridad en el uso de internet']},
+ autonomo:{name:'Gestiona su aprendizaje de manera autónoma',
+  skills:['organizar su tiempo y sus tareas con autonomía','establecer metas y evaluar su avance','reconocer sus aciertos y errores para mejorar','seguir instrucciones sin ayuda constante','buscar ayuda cuando la necesita'],
+  hard:['organizar su tiempo y sus tareas','plantearse metas y evaluarlas','seguir instrucciones por sí solo','reconocer sus errores para corregirlos'],
+  act:['elaborar un horario semanal de tareas y cumplirlo','escribir una meta por semana y revisarla el viernes','revisar sus errores y corregirlos antes de entregar','seguir las instrucciones paso a paso sin ayuda'],
+  fam:['ayudarle a organizar un horario de estudio','supervisar sin resolver por él o ella sus tareas','reconocer cuando cumple sus metas']}
 };
+
+// ---------- Cursos (competencias que evalúa cada uno) y ajustes por curso ----------
 const COURSES=[
- {id:'mat',label:'Matemática',comps:[K.cant,K.reg,K.forma,K.datos],cap:'traducir situaciones a expresiones numéricas y algebraicas, representar formas y datos, y emplear estrategias para resolver problemas'},
- {id:'com',label:'Comunicación',comps:[K.oral,K.lee,K.escribe],cap:'expresar sus ideas con claridad, comprender e interpretar textos escritos y redactar textos coherentes y bien organizados'},
- {id:'ari',label:'Aritmética',comps:[K.cant],cap:'interpretar y representar cantidades, comprender las operaciones con números y emplear estrategias de cálculo y estimación'},
- {id:'alg',label:'Álgebra',comps:[K.reg],cap:'generalizar patrones, plantear ecuaciones, inecuaciones y funciones, y emplear procedimientos algebraicos para resolver problemas'},
- {id:'geo',label:'Geometría',comps:[K.forma],cap:'describir y representar formas geométricas, calcular perímetros, áreas y volúmenes, y ubicarse en el espacio'},
- {id:'tri',label:'Trigonometría',comps:[K.forma],cap:'aplicar razones trigonométricas, resolver triángulos y usar propiedades geométricas en situaciones de medida y localización'},
- {id:'his',label:'Historia',comps:[K.hist],cap:'interpretar fuentes históricas, comprender los cambios y permanencias en el tiempo y explicar procesos históricos'},
- {id:'bio',label:'Biología',comps:[K.indaga,K.explica],cap:'explicar la estructura y el funcionamiento de los seres vivos, relacionar conceptos biológicos con su entorno y realizar indagaciones sencillas'},
- {id:'geog',label:'Geografía',comps:[K.espacio],cap:'comprender las relaciones entre los elementos naturales y sociales del espacio geográfico, interpretar mapas y proponer acciones para cuidar el ambiente'},
- {id:'ct',label:'Ciencia y Tecnología',comps:[K.indaga,K.explica,K.tecno],cap:'formular hipótesis y experimentar, explicar fenómenos del entorno con base científica y proponer soluciones tecnológicas'},
- {id:'pl',label:'Plan Lector',comps:[K.lee],cap:'comprender las lecturas asignadas, inferir información y opinar de manera crítica sobre lo leído'},
- {id:'rm',label:'Raz. Matemático',comps:[K.cant,K.reg],cap:'razonar lógicamente, identificar patrones y plantear estrategias para resolver situaciones problemáticas'},
- {id:'rv',label:'Raz. Verbal',comps:[K.lee],cap:'ampliar su vocabulario, establecer relaciones entre palabras e ideas y comprender textos de distinta complejidad'},
- {id:'ps',label:'Personal Social',comps:[K.ident,K.convive],cap:'reconocerse y valorarse como persona, respetar las normas de convivencia y participar con responsabilidad en su comunidad'},
- {id:'arte',label:'Arte',comps:[K.aprecia,K.crea],cap:'valorar y comentar manifestaciones artísticas, experimentar con técnicas y materiales, y crear producciones con intención expresiva'},
- {id:'ef',label:'Educación Física',comps:[K.motric,K.salud,K.socio],cap:'controlar y coordinar sus movimientos, practicar hábitos saludables y cooperar con sus compañeros en las actividades físicas'},
- {id:'qui',label:'Química',comps:[K.indaga,K.explica],cap:'explicar las propiedades y transformaciones de la materia, resolver ejercicios aplicando conceptos químicos y realizar indagaciones con rigor'},
- {id:'fis',label:'Física',comps:[K.indaga,K.explica],cap:'explicar fenómenos físicos, aplicar leyes y fórmulas para resolver problemas y realizar indagaciones con rigor'},
- {id:'rob',label:'Robótica / IA',comps:[K.tecno,K.tic],cap:'diseñar, armar y programar prototipos para resolver problemas, trabajar en equipo y usar herramientas digitales con criterio'},
- {id:'ing',label:'Inglés',comps:[K.ingOral,K.ingLee,K.ingEsc],cap:'comprender y expresar ideas en inglés, leer textos sencillos y redactar oraciones y párrafos con vocabulario y estructuras adecuadas'},
- {id:'rel',label:'Religión / Tutoría',comps:[K.relId,K.relEnc],cap:'reconocer los valores cristianos, reflexionar sobre su proyecto de vida y practicar el respeto y la solidaridad con los demás'},
- {id:'inf',label:'Informática',comps:[K.tic,K.autonomo],cap:'usar con criterio herramientas y programas informáticos, organizar y presentar información digital y trabajar con autonomía'},
- {id:'mot',label:'Motricidad',comps:[K.motric],cap:'coordinar sus movimientos, conocer su cuerpo y desplazarse con seguridad y autonomía'},
- {id:'lit',label:'Literatura',comps:[K.lee,K.escribe],cap:'comprender e interpretar textos literarios, reconocer recursos y géneros literarios y producir textos con intención creativa'},
- {id:'len',label:'Lenguaje',comps:[K.escribe],cap:'emplear con corrección las normas gramaticales y ortográficas y redactar textos coherentes y cohesionados'}
+ {id:'mat',label:'Matemática',comps:['cant','reg','forma','datos']},
+ {id:'com',label:'Comunicación',comps:['oral','lee','escribe']},
+ {id:'ari',label:'Aritmética',comps:['cant'],ov:{cant:{
+  skills:['resolver problemas con números enteros, fracciones y decimales','aplicar las operaciones y sus propiedades con precisión','calcular con razones, proporciones y porcentajes','estimar y justificar resultados','elegir estrategias de cálculo según la situación'],
+  hard:['aplicar las propiedades de las operaciones','trabajar con fracciones y decimales','plantear la operación que resuelve el problema'],
+  act:['resolver cada día una práctica graduada de ejercicios y problemas','repasar fracciones y porcentajes con situaciones de compras','corregir sus errores en un cuaderno de ejercicios']}}},
+ {id:'alg',label:'Álgebra',comps:['reg'],ov:{reg:{
+  skills:['generalizar patrones mediante expresiones algebraicas','plantear y resolver ecuaciones e inecuaciones','interpretar funciones y sus gráficas','operar con expresiones algebraicas','justificar los pasos de su resolución'],
+  hard:['despejar la incógnita en una ecuación','operar con expresiones algebraicas','interpretar gráficas de funciones'],
+  act:['resolver a diario ecuaciones revisando cada paso','elaborar un formulario con los procedimientos clave','graficar funciones sencillas en papel cuadriculado']}}},
+ {id:'geo',label:'Geometría',comps:['forma'],ov:{forma:{
+  skills:['calcular perímetros, áreas y volúmenes de figuras y sólidos','demostrar propiedades de triángulos y cuadriláteros','representar figuras en el plano con instrumentos','aplicar la semejanza y el teorema de Pitágoras','relacionar los conceptos geométricos con situaciones reales'],
+  hard:['recordar y aplicar las fórmulas de áreas y volúmenes','justificar propiedades geométricas','trazar figuras con precisión'],
+  act:['practicar problemas de áreas y volúmenes con dibujos a escala','elaborar un resumen de fórmulas con ejemplos','trazar figuras con regla y compás cada semana']}}},
+ {id:'tri',label:'Trigonometría',comps:['forma'],ov:{forma:{
+  skills:['aplicar razones trigonométricas en triángulos rectángulos','resolver triángulos con ángulos notables','usar la circunferencia trigonométrica','resolver problemas de alturas y distancias','relacionar las razones trigonométricas con situaciones reales'],
+  hard:['recordar las razones trigonométricas','resolver problemas de ángulos de elevación y depresión','usar los ángulos notables'],
+  act:['aplicar la tabla de razones notables con ejercicios cortos','resolver problemas de alturas y distancias con esquemas','llevar una lista de sus errores comunes para evitarlos']}}},
+ {id:'his',label:'Historia',comps:['hist']},
+ {id:'bio',label:'Biología',comps:['indaga','explica'],ov:{explica:{
+  skills:['explicar la estructura y el funcionamiento de los seres vivos','relacionar los órganos y sistemas con sus funciones','describir la célula y la diversidad de los seres vivos','analizar las relaciones entre los seres vivos y su ambiente','usar el vocabulario biológico con precisión'],
+  hard:['reconocer las funciones de los órganos y sistemas','diferenciar los niveles de organización de los seres vivos','usar el vocabulario biológico'],
+  act:['elaborar esquemas rotulados de cada sistema','repasar los conceptos biológicos con tarjetas de preguntas','observar su entorno y registrar seres vivos y sus características']}}},
+ {id:'geog',label:'Geografía',comps:['espacio']},
+ {id:'ct',label:'Ciencia y Tecnología',comps:['indaga','explica','tecno']},
+ {id:'pl',label:'Plan Lector',comps:['lee'],ov:{lee:{
+  skills:['comprender las lecturas del plan lector','reconocer personajes, ambiente y hechos principales','deducir el mensaje de la obra leída','dar su opinión sobre lo leído con argumentos','leer con fluidez y entonación'],
+  hard:['identificar los hechos principales de la obra','deducir el mensaje de la lectura','opinar con argumentos sobre la obra'],
+  act:['leer veinte minutos al día y contar lo leído','elaborar una ficha con personajes y hechos principales','comentar con su familia lo que más le gustó del libro']}}},
+ {id:'rm',label:'Raz. Matemático',comps:['cant','reg'],ov:{cant:{
+  skills:['razonar con lógica para resolver acertijos y problemas','identificar patrones y secuencias','resolver problemas con operaciones y fracciones usando estrategias ingeniosas','organizar la información en esquemas y tablas'],
+  hard:['interpretar el enunciado y organizar los datos','encontrar la regularidad en una secuencia','elegir la estrategia más rápida'],
+  act:['resolver cada día un problema de ingenio y explicar su estrategia','practicar secuencias y analogías con tiempo controlado','crear sus propios acertijos para compartirlos']},
+  reg:{skills:['descubrir la regla de formación de series numéricas y gráficas','plantear ecuaciones a partir de situaciones lógicas','completar secuencias y analogías','resolver problemas de edades, móviles y fracciones con esquemas'],
+  hard:['hallar la regla de una serie','plantear la ecuación de un problema','completar analogías numéricas'],
+  act:['resolver series y analogías cada día con tiempo controlado','plantear la ecuación de un problema antes de calcular','crear sus propias series para que otros las completen']}}},
+ {id:'rv',label:'Raz. Verbal',comps:['lee'],ov:{lee:{
+  skills:['ampliar su vocabulario y usarlo con precisión','establecer relaciones entre palabras como analogías y sinónimos','comprender textos y reconocer la idea central','completar oraciones y plantear inferencias','identificar el sentido de las palabras según el contexto'],
+  hard:['reconocer sinónimos y antónimos','establecer relaciones de analogía','deducir el significado de una palabra por el contexto'],
+  act:['aprender y usar tres palabras nuevas cada día','subrayar las palabras desconocidas y buscarlas en el diccionario','jugar a buscar sinónimos y antónimos']}}},
+ {id:'ps',label:'Personal Social',comps:['ident','convive']},
+ {id:'arte',label:'Arte',comps:['aprecia','crea']},
+ {id:'ef',label:'Educación Física',comps:['motric','salud','socio']},
+ {id:'qui',label:'Química',comps:['indaga','explica'],ov:{explica:{
+  skills:['explicar las propiedades y los cambios de la materia','aplicar los conceptos de átomo, enlace y reacción','balancear ecuaciones químicas sencillas','interpretar la tabla periódica','usar el lenguaje químico con precisión'],
+  hard:['balancear ecuaciones químicas','interpretar la tabla periódica','relacionar la estructura de la materia con sus propiedades'],
+  act:['practicar el balanceo de ecuaciones con ejercicios breves','elaborar fichas de los elementos y sus propiedades','repasar la tabla periódica con tarjetas']}}},
+ {id:'fis',label:'Física',comps:['indaga','explica'],ov:{explica:{
+  skills:['explicar fenómenos físicos con leyes y principios','resolver problemas de movimiento, fuerza y energía','usar unidades y fórmulas con exactitud','interpretar gráficas de movimiento','relacionar los conceptos físicos con situaciones cotidianas'],
+  hard:['aplicar las fórmulas con las unidades correctas','interpretar gráficas de movimiento','relacionar conceptos físicos con situaciones reales'],
+  act:['resolver cada día un problema de física con esquema y unidades','elaborar un formulario con ejemplos resueltos','explicar un fenómeno cotidiano usando una ley física']}}},
+ {id:'rob',label:'Robótica / IA',comps:['tecno','tic']},
+ {id:'ing',label:'Inglés',comps:['ingOral','ingLee','ingEsc']},
+ {id:'rel',label:'Religión / Tutoría',comps:['relId','relEnc']},
+ {id:'inf',label:'Informática',comps:['tic','autonomo']},
+ {id:'mot',label:'Motricidad',comps:['motric'],ov:{motric:{
+  skills:['coordinar sus movimientos y mantener el equilibrio','reconocer su cuerpo y sus partes','desplazarse con seguridad y autonomía','realizar actividades de motricidad fina como recortar y trazar','seguir consignas de movimiento'],
+  hard:['coordinar sus movimientos','mantener el equilibrio','seguir consignas de movimiento'],
+  act:['jugar a saltar, correr y trepar con supervisión','realizar cada día actividades de recorte y trazo','practicar juegos de equilibrio']}}},
+ {id:'lit',label:'Literatura',comps:['lee','escribe'],ov:{lee:{
+  skills:['interpretar textos literarios y su sentido','reconocer géneros y recursos literarios','relacionar las obras con su contexto','opinar de manera crítica sobre lo leído'],
+  hard:['reconocer los recursos literarios','interpretar el sentido de una obra','opinar con argumentos sobre lo leído'],
+  act:['leer un fragmento literario al día y comentar su sentido','elaborar fichas de los recursos literarios con ejemplos','comparar dos obras y justificar su preferencia']},
+  escribe:{skills:['crear textos literarios con intención creativa','usar recursos literarios en sus escritos','organizar sus ideas en textos narrativos y poéticos','revisar y mejorar su producción'],
+  hard:['usar recursos literarios al escribir','organizar sus ideas en un texto narrativo','revisar y mejorar sus escritos'],
+  act:['escribir un poema o relato breve cada semana','reescribir sus textos incorporando recursos literarios','leer sus escritos en voz alta para pulirlos']}}},
+ {id:'len',label:'Lenguaje',comps:['escribe'],ov:{escribe:{
+  skills:['aplicar normas gramaticales y ortográficas','redactar textos coherentes y cohesionados','usar con corrección las categorías gramaticales','emplear los signos de puntuación','revisar su escritura para mejorarla'],
+  hard:['aplicar las reglas de acentuación','emplear los signos de puntuación','concordar sujeto y verbo'],
+  act:['resolver cada día ejercicios breves de ortografía','escribir y corregir un texto corto cada semana','leer en voz alta sus escritos para detectar errores']}}}
 ];
 const COURSE_BY_ID={}; COURSES.forEach(c=>COURSE_BY_ID[c.id]=c);
 
-// Misma escala que el registro
+// Datos de una competencia dentro de un curso (con ajustes propios del curso si los hay)
+function compData(course,key){
+  const base=COMP[key]; const ov=(course.ov&&course.ov[key])||{};
+  return {key,name:base.name,skills:ov.skills||base.skills,hard:ov.hard||base.hard,act:ov.act||base.act,fam:ov.fam||base.fam};
+}
+
+// ---------- Escala y notas (igual que el registro) ----------
 function toLetter(v){
   if(v===''||v===null||v===undefined) return '';
   const n=parseFloat(v); if(isNaN(n)||n<0||n>20) return '';
@@ -205,9 +396,7 @@ function expVals(row){
 function courseHasNotes(snap){
   return Object.values(snap||{}).some(r=>r&&typeof r==='object'&&(weekVals(r).length||expVals(r).length));
 }
-
-// Nota del estudiante: Semanas 40% + Exposiciones 30% + Comportamiento 5% (igual que el registro).
-// El libro y la evaluación bimestral NO entran. Si hay nota manual del Director, se usa esa.
+// Semanas 40% + Exposiciones 30% + Comportamiento 5%. El libro y la evaluación bimestral NO entran.
 function computeStudent(row,compRaw,override){
   row=row||{};
   const wk=weekVals(row), ex=expVals(row);
@@ -225,18 +414,16 @@ function computeStudent(row,compRaw,override){
     nota=Math.round((tv/tw)*10)/10;
   }
   if(nota===null||isNaN(nota)) return null;
-  return {nota,notaInt:Math.round(nota),nivel:toLetter(nota),manual,weeks:wk,expAvg,semAvg};
+  return {nota,notaInt:Math.round(nota),nivel:toLetter(nota),manual,weeks:wk,expAvg,semAvg,cp};
 }
 
-// ---- Redacción ----
+// ---------- Motor de redacción ----------
 function hashStr(s){ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 function pick(rng,arr){ return arr[Math.floor(rng()*arr.length)]; }
-function listComps(arr){
-  const q=arr.map(c=>'«'+c+'»');
-  if(q.length===1) return 'la competencia '+q[0];
-  return 'las competencias '+q.slice(0,-1).join(', ')+' y '+q[q.length-1];
-}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function lcFirst(s){ return s.charAt(0).toLowerCase()+s.slice(1); }
+function fill(t,v){ return t.replace(/\{(\w+)\}/g,(m,k)=>v[k]); }
 function trendOf(weeks){
   const n=weeks.length; if(n<3) return null;
   const h=Math.floor(n/2);
@@ -249,117 +436,187 @@ function trendOf(weeks){
   if(sd>=2.5) return 'irregular';
   return 'stable';
 }
-const T_LEVEL={
- AD:['Demuestra un desempeño destacado en {c}, superando el nivel esperado para su grado.','Evidencia un nivel de logro destacado en {c}, por encima de lo esperado en este bimestre.'],
- A:['Logra el nivel esperado en {c}, evidenciando los aprendizajes previstos para el bimestre.','Alcanza los aprendizajes previstos en {c}, con un desempeño satisfactorio.'],
- B:['Se encuentra en proceso de lograr {c}; está próximo al nivel esperado pero necesita acompañamiento.','Evidencia avances en {c}, aunque aún no alcanza el nivel esperado y requiere acompañamiento del docente.'],
- C:['Se encuentra en inicio en {c}; presenta un progreso mínimo y requiere mayor tiempo de acompañamiento.','Muestra un progreso mínimo en {c} y necesita intervención y acompañamiento constante del docente.']
+function trendKey(st){ return trendOf(st.weeks||[])||'stable'; }
+
+// 1) LOGRO concreto
+const OPEN={
+ AD:['Demuestra un desempeño destacado al {sk}','Evidencia un logro sobresaliente: logra {sk}','Supera lo esperado, pues logra {sk}','Destaca por su capacidad para {sk}','Alcanza un nivel destacado al {sk}'],
+ A:['Logra {sk}, como se espera para su grado','Alcanza el nivel esperado al {sk}','Evidencia un buen dominio al {sk}','Demuestra capacidad para {sk}','Cumple lo previsto en el bimestre al {sk}'],
+ B:['Está en camino de lograr {sk}','Muestra avances al {sk}, aunque aún en proceso','Logra parcialmente {sk}','Se acerca al nivel esperado al {sk}','Va desarrollando su capacidad para {sk}'],
+ C:['Inicia el desarrollo de la competencia: apenas logra {sk}','Muestra un progreso inicial al {sk}','Se encuentra en inicio: requiere apoyo para {sk}','Presenta un avance mínimo al {sk}','Está empezando a lograr {sk}, con ayuda del docente']
 };
-const T_CAP={
- AD:['Es capaz de {k}, con autonomía y de manera argumentada.','Logra {k} con seguridad, precisión y autonomía.'],
- A:['Es capaz de {k} de manera adecuada.','Logra {k} con un desempeño satisfactorio.'],
- B:['Aún necesita fortalecer su capacidad para {k}.','Presenta dificultades parciales para {k}.'],
- C:['Tiene dificultades para {k}.','Aún no logra {k} sin el apoyo del docente.']
+// 2) DETALLE de desempeño / dificultad según nota y tendencia
+const DET={
+ up:{hi:['sus notas semanales fueron mejorando y ahora muestra solidez al {sk2}','mejoró progresivamente a lo largo del bimestre y ya demuestra seguridad al {sk2}','su rendimiento creció semana a semana, lo que se refleja en su capacidad para {sk2}'],
+     lo:['sus notas fueron mejorando semana a semana, aunque aún le cuesta {hard}','mostró avances durante el bimestre, pero todavía presenta dificultad para {hard}','mejoró en las últimas semanas; sin embargo, necesita apoyo para {hard}']},
+ down:{hi:['sus notas bajaron en las últimas semanas, por lo que debe cuidar su constancia al {sk2}','bajó ligeramente su rendimiento al final del bimestre; conviene que mantenga su ritmo al {sk2}'],
+     lo:['sus notas bajaron en las últimas semanas y presenta dificultad para {hard}','disminuyó su rendimiento al final del bimestre y necesita apoyo para {hard}','sus resultados decayeron en las últimas semanas, y aún le cuesta {hard}']},
+ irregular:{hi:['sus resultados alternaron semanas sobresalientes con otras más bajas; debe sostener su nivel al {sk2}','su rendimiento fue variable, aunque en sus mejores semanas demuestra solvencia al {sk2}'],
+     lo:['sus resultados fueron variables de una semana a otra y aún le cuesta {hard}','alternó semanas de buen desempeño con otras de bajo logro y presenta dificultad para {hard}','su rendimiento fue irregular y necesita apoyo para {hard}']},
+ stable:{hi:['mantuvo un nivel sostenido durante el bimestre y demuestra solvencia al {sk2}','sus notas se mantuvieron firmes a lo largo del bimestre, con dominio al {sk2}','fue constante en sus evaluaciones semanales y muestra seguridad al {sk2}'],
+     lo:['sus notas se mantuvieron en un nivel similar y aún le cuesta {hard}','no mostró cambios notorios en el bimestre y presenta dificultad para {hard}','su rendimiento se mantuvo sin avances claros y necesita apoyo para {hard}']}
 };
-const T_TREND={
- up:['A lo largo del bimestre mostró una mejora progresiva en sus evaluaciones semanales.','Sus resultados semanales evidencian un avance sostenido durante el bimestre.','Se observa una evolución positiva en su desempeño de las últimas semanas.'],
- down:['Sus resultados semanales disminuyeron hacia el final del bimestre, por lo que conviene reforzar su constancia.','Se observa un descenso en su rendimiento en las últimas semanas del bimestre.'],
- irregular:['Sus resultados semanales fueron irregulares, alternando semanas de buen desempeño con otras de menor logro.','Presentó un rendimiento variable a lo largo del bimestre; necesita mayor constancia.'],
- stableHigh:['Mantuvo un desempeño constante y sostenido durante todo el bimestre.','Se mostró estable y responsable en sus evaluaciones semanales.'],
- stableLow:['Mantuvo un nivel similar durante el bimestre, sin avances notorios.','Sus resultados semanales se mantuvieron en un nivel parecido a lo largo del bimestre.']
+const CONN=['','','','Además, ','Asimismo, ','En el bimestre, '];
+const TAIL={
+ AD:['',', lo que le permite asumir retos de mayor complejidad',', destacando entre sus compañeros',', con gran autonomía'],
+ A:['',', aunque aún puede afianzar su capacidad para {hard}',', con posibilidad de alcanzar el nivel destacado',', con buen ritmo de trabajo'],
+ B:['',', y con refuerzo puede alcanzar el nivel esperado',', pero con práctica constante puede mejorar',', lo que limita su avance'],
+ C:['',', por lo que requiere acompañamiento cercano',', y necesita refuerzo constante para avanzar',', lo que dificulta su progreso']
 };
-const T_EXP={
- high:['Participa con seguridad y claridad en las exposiciones y trabajos grupales.','Se desenvuelve bien en las exposiciones y trabajos grupales, comunicando sus ideas con claridad.'],
- B:['Debe fortalecer la claridad y la seguridad en sus exposiciones y trabajos grupales.','En las exposiciones y trabajos grupales necesita mejorar la organización y la expresión de sus ideas.'],
- C:['Requiere apoyo para participar y organizar sus ideas en las exposiciones y trabajos grupales.','Necesita acompañamiento para exponer sus ideas y participar en los trabajos grupales.']
-};
-const T_REC={
- AD:['Se recomienda proponerle retos de mayor complejidad para seguir desarrollando su potencial.','Se sugiere asignarle actividades de profundización y fomentar que apoye a sus compañeros.','Se recomienda mantener su ritmo de trabajo y brindarle desafíos que amplíen sus aprendizajes.'],
- A:['Se recomienda mantener su dedicación y reforzar los aspectos que le permitan alcanzar el nivel destacado.','Se sugiere continuar con la práctica constante para consolidar lo aprendido y avanzar al siguiente nivel.','Se recomienda seguir con el mismo compromiso y afianzar los temas de mayor dificultad.'],
- B:['Se recomienda reforzar los aprendizajes con práctica adicional en casa y el acompañamiento del docente.','Se sugiere que el apoderado supervise el repaso de los temas trabajados y que participe en las actividades de refuerzo.','Se recomienda mayor constancia en el estudio y el aprovechamiento de las clases de reforzamiento.'],
- C:['Se recomienda un plan de reforzamiento con acompañamiento permanente del docente y el apoyo constante de la familia.','Se sugiere atención personalizada, actividades de refuerzo y el compromiso del apoderado para el seguimiento diario.','Se recomienda una intervención oportuna con tutoría y refuerzo, y una comunicación frecuente con el apoderado.']
-};
-function genText(course,st,name,bim,bump){
-  const nivel=st.nivel||'B';
-  const rng=mulberry32((hashStr(name+'|'+course.id+'|'+bim)+(bump||0)*7919)>>>0);
-  const parts=[];
-  parts.push(pick(rng,T_LEVEL[nivel]).replace('{c}',listComps(course.comps)));
-  parts.push(pick(rng,T_CAP[nivel]).replace('{k}',course.cap));
-  const tr=trendOf(st.weeks||[]);
-  if(tr){
-    const key=tr==='stable'?((nivel==='AD'||nivel==='A')?'stableHigh':'stableLow'):tr;
-    parts.push(pick(rng,T_TREND[key]));
-  }
-  if(st.expAvg!==null&&st.expAvg!==undefined){
-    const el=toLetter(st.expAvg);
-    const ek=(el==='AD'||el==='A')?'high':(el==='B'?'B':'C');
-    parts.push(pick(rng,T_EXP[ek]));
-  }
-  parts.push(pick(rng,T_REC[nivel]));
-  return parts.join(' ');
+function tailPool(nivel,nota){
+  const p=TAIL[nivel].slice();
+  if(nivel==='A'&&nota>=16) p.push(', y está próximo a alcanzar el nivel destacado');
+  if(nivel==='B'&&nota>=12.5) p.push(', y está próximo a alcanzar el nivel esperado');
+  if(nivel==='C'&&nota<=7) p.push(', por lo que necesita apoyo permanente');
+  if(nivel==='A'&&nota<15) p.push(', aunque aún puede reforzar algunos aprendizajes');
+  return p;
 }
-// Síntesis para SIAGIE: máximo 350 caracteres
-const SIAGIE_MAX=350;
-const S_LEVEL={
- AD:['Logra un nivel destacado en {l}, superando lo esperado.','Evidencia un desempeño destacado en {l}.'],
- A:['Logra el nivel esperado en {l}.','Alcanza los aprendizajes previstos en {l}.'],
- B:['Está en proceso de lograr lo esperado en {l}.','Evidencia avances en {l}, pero aún no alcanza lo esperado.'],
- C:['Está en inicio en {l}, con un progreso mínimo.','Muestra un progreso mínimo en {l} y requiere acompañamiento.']
+// 3) RECOMENDACIÓN práctica
+const RECA={
+ AD:['Se sugiere {act} y plantearle retos de mayor complejidad.','Se recomienda proponerle desafíos adicionales y {act}.','Para seguir creciendo, se aconseja {act}.','Conviene {act} y animarle a apoyar a sus compañeros.','Se recomienda {act} y participar en proyectos del área.'],
+ A:['Se recomienda {act} para consolidar lo aprendido.','Se sugiere {act} y mantener su constancia.','Para alcanzar el nivel destacado, se aconseja {act}.','Conviene {act} y reforzar los temas más difíciles.','Lo ideal es {act} con constancia.'],
+ B:['Se recomienda {act} con acompañamiento del docente.','Es importante {act} y asistir a las sesiones de refuerzo.','Se sugiere {act} de forma constante para alcanzar el nivel esperado.','Conviene {act} y pedir ayuda cuando tenga dudas.','Lo ideal es {act} con regularidad.'],
+ C:['Se requiere un plan de refuerzo: {act}, con apoyo permanente del docente.','Es necesario {act}, con seguimiento cercano.','Se recomienda {act} y trabajar con actividades graduadas desde lo más sencillo.','Es urgente {act}, con retroalimentación frecuente.','Se sugiere {act} en tutoría o en horario de refuerzo.']
 };
-const S_TREND={
- up:['Mejoró progresivamente durante el bimestre.','Muestra avance sostenido en el bimestre.'],
- down:['Su rendimiento disminuyó hacia el final del bimestre.','Bajó su rendimiento en las últimas semanas.'],
- irregular:['Su rendimiento fue irregular; necesita más constancia.','Alterna semanas de buen y bajo desempeño.'],
- stableHigh:['Mantuvo un desempeño constante.','Se mostró estable y responsable.'],
- stableLow:['']
+const RECF={
+ AD:['En casa, conviene {fam} para seguir potenciando su talento.','Se invita a la familia a {fam}.','La familia puede {fam} y reconocer sus logros.'],
+ A:['En casa, se sugiere {fam}.','Se invita a la familia a {fam} para consolidar su avance.','La familia puede {fam}.'],
+ B:['La familia puede {fam} y reforzar lo trabajado en clase.','Se solicita a la familia {fam}.','En casa, es importante {fam}.'],
+ C:['Se solicita a la familia {fam}.','En casa, se requiere {fam} con constancia.','El apoyo familiar es clave: se sugiere {fam}.']
 };
-const S_EXP={high:['Expone con seguridad.','Se desenvuelve bien en exposiciones.'],B:['Debe mejorar la claridad en sus exposiciones.'],C:['Requiere apoyo para exponer sus ideas.']};
-const S_REC={
- AD:['Se sugiere proponerle retos de mayor complejidad.','Se recomienda ofrecerle actividades de profundización.'],
- A:['Se recomienda afianzar los temas de mayor dificultad.','Se sugiere continuar con práctica constante.'],
- B:['Se recomienda reforzar con práctica en casa y apoyo del docente.','Se sugiere repaso constante y asistencia a reforzamiento.'],
- C:['Se recomienda plan de reforzamiento y apoyo constante de la familia.','Se sugiere atención personalizada y seguimiento diario del apoderado.']
+const EXPO={
+ hi:['Sus exposiciones y trabajos grupales confirman que sabe {sk3}.','En sus exposiciones y trabajos grupales, evidencia que logra {sk3}.'],
+ lo:['En sus exposiciones y trabajos grupales, aún necesita apoyo para {sk3}.','En las exposiciones y trabajos grupales, todavía le cuesta {sk3}.']
 };
-function genShort(course,st,name,bim,bump){
-  const nivel=st.nivel||'B';
-  const rng=mulberry32((hashStr(name+'|'+course.id+'|'+bim+'|s')+(bump||0)*7919)>>>0);
-  const lvl=pick(rng,S_LEVEL[nivel]).replace('{l}',course.label);
-  const tr=trendOf(st.weeks||[]);
-  let trT='';
-  if(tr){ const key=tr==='stable'?((nivel==='AD'||nivel==='A')?'stableHigh':'stableLow'):tr; trT=pick(rng,S_TREND[key]); }
-  let exT='';
-  if(st.expAvg!==null&&st.expAvg!==undefined){ const el=toLetter(st.expAvg); exT=pick(rng,S_EXP[(el==='AD'||el==='A')?'high':(el==='B'?'B':'C')]); }
-  const rec=pick(rng,S_REC[nivel]);
-  // Se quitan partes opcionales si no cabe en 350 caracteres
-  const tries=[[lvl,trT,exT,rec],[lvl,trT,rec],[lvl,rec],[lvl]];
-  for(const t of tries){ const s=t.filter(Boolean).join(' '); if(s.length<=SIAGIE_MAX) return s; }
-  return lvl.slice(0,SIAGIE_MAX);
+
+function seedFor(name,course,ck,bim,tag,bump,salt){
+  return (hashStr(name+'|'+course.id+'|'+ck+'|'+bim+'|'+tag)+(bump||0)*7919+(salt||0)*104729)>>>0;
+}
+function pickOther(rng,arr,not){ let v=pick(rng,arr),g=0; while(v===not&&g++<6) v=pick(rng,arr); return v; }
+
+function buildShort(cd,st,rng){
+  const nivel=st.nivel||'B', hi=(nivel==='AD'||nivel==='A');
+  const sk=pick(rng,cd.skills), sk2=pickOther(rng,cd.skills,sk);
+  const v={sk,sk2,hard:pick(rng,cd.hard),act:pick(rng,cd.act),fam:pick(rng,cd.fam)};
+  const s1=cap(fill(pick(rng,OPEN[nivel]),v))+'.';
+  let det=pick(rng,DET[trendKey(st)][hi?'hi':'lo']);
+  const conn=pick(rng,CONN);
+  det=(conn?conn+det:cap(det))+pick(rng,tailPool(nivel,st.nota));
+  const s2=cap(fill(det,v))+'.';
+  const r=rng();
+  const rec=(r<0.62)?pick(rng,RECA[nivel]):pick(rng,RECF[nivel]);
+  return [s1,s2,cap(fill(rec,v))].join(' ');
+}
+// Redacción para SIAGIE: 315–340 caracteres (nunca más de 350). 'used' evita textos idénticos en un mismo curso/competencia.
+function genShort(course,ck,st,name,bim,bump,used){
+  const cd=compData(course,ck); let best=null,bestD=1e9;
+  for(let salt=0;salt<900;salt++){
+    const rng=mulberry32(seedFor(name,course,ck,bim,'s',bump,salt));
+    const t=buildShort(cd,st,rng), L=t.length;
+    if(used&&used.has(t)) continue;
+    if(L>=SIAGIE_MIN_OBJ&&L<=SIAGIE_MAX_OBJ){ if(used) used.add(t); return t; }
+    if(L<=SIAGIE_MAX){ const d=Math.abs(L-327); if(d<bestD){bestD=d;best=t;} }
+  }
+  if(!best){ const rng=mulberry32(seedFor(name,course,ck,bim,'s',bump,0)); best=buildShort(cd,st,rng).slice(0,SIAGIE_MAX); }
+  if(used) used.add(best);
+  return best;
+}
+// Versión completa (sin límite de caracteres)
+function genFull(course,ck,st,name,bim,bump,used){
+  const cd=compData(course,ck), nivel=st.nivel||'B', hi=(nivel==='AD'||nivel==='A'); let t='';
+  for(let salt=0;salt<40;salt++){
+    const rng=mulberry32(seedFor(name,course,ck,bim,'f',bump,salt));
+    const sk=pick(rng,cd.skills), sk2=pickOther(rng,cd.skills,sk), sk3=pickOther(rng,cd.skills,sk2);
+    const v={sk,sk2,sk3,hard:pick(rng,cd.hard),act:pick(rng,cd.act),fam:pick(rng,cd.fam)};
+    const parts=[cap(fill(pick(rng,OPEN[nivel]),v))+'.'];
+    const conn=pick(rng,CONN); let det=pick(rng,DET[trendKey(st)][hi?'hi':'lo']);
+    det=(conn?conn+det:cap(det))+pick(rng,tailPool(nivel,st.nota));
+    parts.push(cap(fill(det,v))+'.');
+    if(st.expAvg!==null&&st.expAvg!==undefined){
+      const el=toLetter(st.expAvg); parts.push(fill(pick(rng,EXPO[(el==='AD'||el==='A')?'hi':'lo']),v));
+    }
+    parts.push(cap(fill(pick(rng,RECA[nivel]),v)));
+    parts.push(cap(fill(pick(rng,RECF[nivel]),v)));
+    t=parts.join(' ');
+    if(!used||!used.has(t)) break;
+  }
+  if(used) used.add(t);
+  return t;
 }
 function buildCourseRows(course,snap,names,comp,overrides,bim){
-  const rows=[];
+  const rows=[]; const usedS={},usedF={};
+  course.comps.forEach(k=>{usedS[k]=new Set();usedF[k]=new Set();});
   for(let idx=0;idx<names.length;idx++){
     const name=names[idx];
     if(!name||!String(name).trim()) continue;
     const st=computeStudent((snap||{})[idx],(comp||{})[idx],(overrides||{})[idx]);
     if(!st) continue;
-    const nm=String(name).trim();
-    rows.push({idx,name:nm,st,nota:st.notaInt,nivel:st.nivel,manual:st.manual,
-      bump:0,edited:false,text:genText(course,st,nm,bim,0),
-      short:genShort(course,st,nm,bim,0),editedShort:false});
+    const nm=String(name).trim(); const c={};
+    course.comps.forEach(k=>{
+      c[k]={bump:0,edF:false,edS:false,hint:'',ai:false,
+        text:genFull(course,k,st,nm,bim,0,usedF[k]),short:genShort(course,k,st,nm,bim,0,usedS[k])};
+    });
+    rows.push({idx,name:nm,st,nota:st.notaInt,nivel:st.nivel,manual:st.manual,c});
   }
   return rows;
 }
 
-// ---- Excel (ExcelJS) ----
-function buildWorkbook(ExcelJS,meta,courses){
+// ---------- Prompt e IA (Gemini) ----------
+const NIVEL_TXT={AD:'AD (logro destacado)',A:'A (logro esperado)',B:'B (en proceso)',C:'C (en inicio)'};
+function gradoTexto(g){
+  if(/Añitos/.test(g)) return g.replace('Añitos','años')+' (Educación Inicial)';
+  if(/°/.test(g)) return g.replace('°','.° grado')+' (Educación Primaria)';
+  return 'grado/aula '+g+' (Educación Secundaria)';
+}
+function buildPrompt(d){
+  const w=(d.weeks&&d.weeks.length)?d.weeks.map(x=>'S'+x.w+'='+x.v).join(', '):'sin registro';
+  const L=[
+   'Eres un docente peruano experto en evaluación formativa del Currículo Nacional de la Educación Básica (CNEB) del MINEDU. Redacta la CONCLUSIÓN DESCRIPTIVA de un estudiante para registrarla en el SIAGIE.',
+   '',
+   'DATOS DEL ESTUDIANTE (no se conoce su nombre):',
+   '- Grado: '+gradoTexto(d.grado),
+   '- Curso: '+d.curso,
+   '- Competencia evaluada: '+d.competencia,
+   '- Nivel de logro: '+NIVEL_TXT[d.nivel],
+   '- Nota final del bimestre (0-20): '+d.nota,
+   '- Notas semanales: '+w,
+   '- Promedio de exposiciones: '+(d.expAvg!=null?(Math.round(d.expAvg*10)/10):'sin registro'),
+   '- Comportamiento: '+(d.cp!=null?d.cp:'sin registro'),
+   '- Indicación del docente: '+(d.hint&&d.hint.trim()?d.hint.trim():'ninguna'),
+   '',
+   'REGLAS OBLIGATORIAS:',
+   '1. Devuelve ÚNICAMENTE el texto final de la conclusión: sin saludos, sin comillas, sin títulos, sin viñetas y sin explicaciones.',
+   '2. Un solo párrafo en español pedagógico del MINEDU Perú, en tercera persona y sin mencionar el nombre del estudiante ni su género (usa verbos sin sujeto, por ejemplo "Logra...", "Necesita...").',
+   '3. Estructura: (a) logro concreto alcanzado en esa competencia; (b) detalle de su desempeño o de la dificultad identificada, según su nota y la tendencia de sus notas semanales; (c) una recomendación práctica y accionable para el estudiante o la familia.',
+   '4. Habla solo de habilidades y desempeños propios de esa competencia en ese curso. No escribas el nombre de la competencia ni cites las notas numéricas. Evita frases genéricas válidas para cualquier área.',
+   '5. Si el docente dio una indicación, inclúyela de forma natural.',
+   '6. LONGITUD ESTRICTA: entre 315 y 340 caracteres contando espacios y signos (nunca más de 350).'
+  ];
+  return L.join('\n');
+}
+function cleanAI(t){
+  t=String(t||'').replace(/```[a-z]*/gi,'').replace(/\*\*|__/g,'').replace(/[\r\n]+/g,' ').replace(/\s{2,}/g,' ').trim();
+  t=t.replace(/^[\s"'“”«»‘’]+|[\s"'“”«»‘’]+$/g,'').trim();
+  return t;
+}
+// Recorta en el último punto que quede dentro del límite (solo como último recurso)
+function trimToLimit(t,max){
+  if(t.length<=max) return t;
+  const cut=t.slice(0,max); const p=Math.max(cut.lastIndexOf('. '),cut.lastIndexOf('.'));
+  if(p>=SIAGIE_MIN_OBJ-60) return cut.slice(0,p+1);
+  const sp=cut.lastIndexOf(' '); return cut.slice(0,sp>0?sp:max).replace(/[,;:\s]+$/,'')+'.';
+}
+
+// ---------- Excel (ExcelJS): una hoja por competencia ----------
+function buildWorkbook(ExcelJS,meta,sheets){
   const wb=new ExcelJS.Workbook();
   wb.creator='I.E.P. La Nueva Esperanza'; wb.created=new Date();
   const used=new Set();
   const FILL={AD:'FFC8F0DC',A:'FFC8DFF8',B:'FFFEF0B0',C:'FFFAD0D0'};
   const thin={style:'thin',color:{argb:'FFB0C8E8'}};
   const border={top:thin,left:thin,bottom:thin,right:thin};
-  courses.forEach(c=>{
-    let name=(c.label||'Curso').replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31)||'Curso';
+  sheets.forEach(c=>{
+    let name=(c.sheet||'Hoja').replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31)||'Hoja';
     const base=name; let k=2;
     while(used.has(name.toLowerCase())){ name=base.slice(0,28)+' '+(k++); }
     used.add(name.toLowerCase());
@@ -367,7 +624,7 @@ function buildWorkbook(ExcelJS,meta,courses){
       views:[{state:'frozen',ySplit:5}],
       pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}
     });
-    ws.columns=[{width:5},{width:34},{width:7},{width:8},{width:80},{width:58},{width:10}];
+    ws.columns=[{width:5},{width:34},{width:7},{width:8},{width:80},{width:58},{width:11}];
     const line=(r,text,opt)=>{
       ws.mergeCells('A'+r+':G'+r);
       const cell=ws.getCell('A'+r); cell.value=text;
@@ -375,19 +632,19 @@ function buildWorkbook(ExcelJS,meta,courses){
       cell.alignment={vertical:'middle',wrapText:true};
       if(opt.h) ws.getRow(r).height=opt.h;
     };
-    line(1,'I.E.P. «La Nueva Esperanza» — La Oroya   |   Conclusiones descriptivas — '+c.label+'   |   '+meta.grado+' Grado · Sección '+meta.seccion+' · Bimestre '+meta.bim,{font:{bold:true,size:12,color:{argb:'FF1A4E9A'}},h:24});
+    line(1,'I.E.P. «La Nueva Esperanza» — La Oroya   |   Conclusiones descriptivas — '+c.curso+'   |   '+meta.grado+' · Sección '+meta.seccion+' · Bimestre '+meta.bim,{font:{bold:true,size:12,color:{argb:'FF1A4E9A'}},h:24});
     line(2,'Docente: '+(c.docente||'—'),{font:{bold:true},h:18});
-    line(3,'Competencias (CNEB): '+c.comps.join(' · '),{font:{size:10},h:32});
-    line(4,'Redacción generada a partir de las notas del registro (semanas, exposiciones y comportamiento). El docente debe revisarla y ajustarla antes de su uso oficial.',{font:{italic:true,size:9,color:{argb:'FF6B6258'}},h:16});
+    line(3,'Competencia (CNEB): '+c.competencia,{font:{size:10,bold:true},h:30});
+    line(4,'Redacción generada a partir de las notas del registro. El docente debe revisarla y ajustarla antes de su uso oficial. La síntesis para SIAGIE admite un máximo de 350 caracteres.',{font:{italic:true,size:9,color:{argb:'FF6B6258'}},h:16});
     const hr=ws.getRow(5);
     ['N°','Apellidos y nombres','Nota','Nivel','Conclusión descriptiva (completa)','Síntesis para SIAGIE (máx. 350 car.)','N° de caracteres'].forEach((t,i)=>{
       const cell=hr.getCell(i+1); cell.value=t;
       cell.font={bold:true,color:{argb:'FFFFFFFF'},name:'Calibri',size:11};
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A4E9A'}};
-      cell.alignment={vertical:'middle',horizontal:(i===4||i===5||i===1)?'left':'center'};
+      cell.alignment={vertical:'middle',wrapText:true,horizontal:(i===4||i===5||i===1)?'left':'center'};
       cell.border=border;
     });
-    hr.height=22;
+    hr.height=30;
     c.rows.forEach((r,i)=>{
       const row=ws.getRow(6+i);
       row.getCell(1).value=i+1;
@@ -407,7 +664,7 @@ function buildWorkbook(ExcelJS,meta,courses){
         row.getCell(3).fill={type:'pattern',pattern:'solid',fgColor:{argb:FILL[r.nivel]}};
         row.getCell(4).fill={type:'pattern',pattern:'solid',fgColor:{argb:FILL[r.nivel]}};
       }
-      row.height=Math.max(32,Math.ceil((r.text||'').length/90)*14+10);
+      row.height=Math.max(48,Math.ceil((r.text||'').length/85)*14+8);
     });
   });
   return wb;
@@ -416,10 +673,13 @@ function buildWorkbook(ExcelJS,meta,courses){
 
 // ======================= Pantalla =======================
 const $=id=>document.getElementById(id);
-const state={mode:'full',user:null,bim:'I',grado:'',seccion:'',names:[],courses:{},assign:{}};
+const state={mode:'short',user:null,bim:'I',grado:'',seccion:'',names:[],courses:{},assign:{}};
+const GKEY='lne_gemini_key';
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function pj(s){try{return JSON.parse(s)||{};}catch(e){return {};}}
 function setStatus(msg,bad){const el=$('status');el.textContent=msg||'';el.className=bad?'bad':'';}
+function getKey(){ try{ return localStorage.getItem(GKEY)||''; }catch(e){ return ''; } }
+function setKey(k){ try{ if(k) localStorage.setItem(GKEY,k); else localStorage.removeItem(GKEY); return true; }catch(e){ return false; } }
 
 async function initLogin(){
   try{
@@ -455,12 +715,10 @@ function showMain(){
     $('selGrado').value='1°';
     $('selSeccion').innerHTML=ALL_SECCIONES.map(s=>'<option>'+esc(s)+'</option>').join('');
     $('selSeccion').value='Única';
-    // Contexto enviado desde el registro (?g=&s=&b=)
-    let auto=false;
     try{
       const qp=new URLSearchParams(location.search);
       const g=qp.get('g'), s=qp.get('s'), b=qp.get('b');
-      if(g&&ALL_GRADOS.includes(g)){ $('selGrado').value=g; auto=true; }
+      if(g&&ALL_GRADOS.includes(g)) $('selGrado').value=g;
       if(s&&ALL_SECCIONES.includes(s)) $('selSeccion').value=s;
       if(b&&BIMS.includes(b)) state.bim=b;
     }catch(e){}
@@ -514,7 +772,7 @@ async function loadAll(){
       const ov=overridesByCourse['logro_'+grado+'_'+seccion+'_'+bim+'_'+c.id]||{};
       if(!courseHasNotes(snap)&&!Object.keys(ov).length) return;
       const rows=buildCourseRows(c,snap,names,comp,ov,bim);
-      if(rows.length){ courses[c.id]={rows}; total+=rows.length; }
+      if(rows.length){ courses[c.id]={rows}; total+=rows.length*c.comps.length; }
     });
     state.grado=grado; state.seccion=seccion; state.names=names; state.courses=courses;
     state.assign=assignRes.data?pj(assignRes.data.valor):{};
@@ -526,13 +784,36 @@ async function loadAll(){
       return;
     }
     $('courseFilter').innerHTML='<option value="all">Todos los cursos ('+ids.length+')</option>'+ids.map(i=>'<option value="'+i+'">'+esc(COURSE_BY_ID[i].label)+'</option>').join('');
+    syncCompFilter();
     $('bar').style.display='flex';
     renderResults();
-    setStatus('✓ '+total+' conclusiones en '+ids.length+' cursos. Revisa o edita los textos y descarga el Excel.');
+    setStatus('✓ '+total+' conclusiones (por competencia) en '+ids.length+' cursos. Revisa o edita los textos y descarga el Excel.');
   }catch(e){
     console.error(e); setStatus('❌ No se pudo cargar: '+(e.message||e),true);
   }finally{ $('btnLoad').disabled=false; }
 }
+
+// ----- filtros de curso y competencia -----
+function onCourseChange(){ syncCompFilter(); renderResults(); }
+function syncCompFilter(){
+  const f=$('courseFilter').value||'all', w=$('compWrap'), sel=$('compFilter');
+  if(f!=='all'&&COURSE_BY_ID[f]&&COURSE_BY_ID[f].comps.length>1){
+    const c=COURSE_BY_ID[f];
+    sel.innerHTML='<option value="all">Todas las competencias ('+c.comps.length+', separadas)</option>'+
+      c.comps.map((k,i)=>'<option value="'+k+'">Competencia '+(i+1)+': '+esc(COMP[k].name)+'</option>').join('');
+    w.style.display='block';
+  } else { sel.innerHTML='<option value="all">Todas</option>'; w.style.display='none'; }
+}
+function compsShown(cid){
+  const c=COURSE_BY_ID[cid], f=$('courseFilter').value||'all', cf=$('compFilter').value||'all';
+  if(f===cid&&cf!=='all'&&c.comps.includes(cf)) return [cf];
+  return c.comps;
+}
+function curText(r,ck){ return state.mode==='short'?r.c[ck].short:r.c[ck].text; }
+function curEdited(r,ck){ return state.mode==='short'?r.c[ck].edS:r.c[ck].edF; }
+function ccLabel(t){ const n=t.length; const bad=n>SIAGIE_MAX, warn=n<SIAGIE_MIN_OBJ||n>SIAGIE_MAX_OBJ;
+  return '<span style="color:'+(bad?'#9B1B1B':warn?'#B45309':'#1D6F42')+';font-weight:700">'+n+' / '+SIAGIE_MAX+' caracteres'+(bad?' — excede el límite de SIAGIE':'')+'</span>'; }
+function setMode(m){ state.mode=m; $('modeSel').value=m; renderResults(); }
 
 function renderResults(){
   const cont=$('results');
@@ -540,7 +821,8 @@ function renderResults(){
   if(!ids.length){ cont.innerHTML=''; return; }
   const f=$('courseFilter').value||'all';
   const show=f==='all'?ids:ids.filter(i=>i===f);
-  $('btnXls').textContent=f==='all'?'⬇ Descargar Excel (todos los cursos)':'⬇ Descargar Excel ('+COURSE_BY_ID[f].label+')';
+  const cf=$('compFilter').value||'all';
+  $('btnXls').textContent=f==='all'?'⬇ Descargar Excel (todos los cursos)':('⬇ Descargar Excel ('+COURSE_BY_ID[f].label+(cf!=='all'&&COMP[cf]?' · 1 competencia':'')+')');
   cont.innerHTML=show.map(cid=>courseBlock(cid,f!=='all')).join('');
 }
 function courseBlock(cid,open){
@@ -549,64 +831,173 @@ function courseBlock(cid,open){
   d.rows.forEach(r=>{ if(cnt[r.nivel]!==undefined) cnt[r.nivel]++; });
   const doc=state.assign[cid]||'sin docente asignado';
   const chips=['AD','A','B','C'].map(l=>cnt[l]?'<span class="lv lv'+l+'">'+l+' '+cnt[l]+'</span>':'').join('');
-  const rows=d.rows.map((r,i)=>
-    '<tr><td class="num">'+(i+1)+'</td><td class="nm">'+esc(r.name)+'</td>'+
+  const shown=compsShown(cid);
+  const tables=shown.map(ck=>{
+    const idxN=c.comps.indexOf(ck)+1;
+    const head=(c.comps.length>1)?'<div class="comps"><b>Competencia '+idxN+' de '+c.comps.length+':</b> '+esc(COMP[ck].name)+'</div>':'<div class="comps"><b>Competencia:</b> '+esc(COMP[ck].name)+'</div>';
+    const rows=d.rows.map((r,i)=>rowHtml(cid,ck,r,i)).join('');
+    return head+'<div class="tbl"><table><thead><tr><th style="width:36px">N°</th><th>Estudiante</th><th style="width:56px;text-align:center">Nota</th><th style="width:56px;text-align:center">Nivel</th><th>'+(state.mode==='short'?'Síntesis para SIAGIE':'Conclusión descriptiva (completa)')+'</th><th style="width:40px"></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }).join('');
+  return '<details'+(open?' open':'')+'><summary>'+esc(c.label)+
+    '<span class="meta">'+d.rows.length+' estudiantes · '+c.comps.length+' competencia'+(c.comps.length>1?'s':'')+' · Docente: '+esc(doc)+'</span><span class="chips">'+chips+'</span></summary>'+tables+'</details>';
+}
+function rowHtml(cid,ck,r,i){
+  const k=cid+'_'+ck+'_'+r.idx, t=curText(r,ck), q="'"+cid+"','"+ck+"',"+r.idx;
+  return '<tr><td class="num">'+(i+1)+'</td><td class="nm">'+esc(r.name)+'</td>'+
     '<td class="num">'+r.nota+(r.manual?'<span class="star" title="Nota manual del Director">*</span>':'')+'</td>'+
     '<td class="num"><span class="lv lv'+r.nivel+'">'+r.nivel+'</span></td>'+
-    '<td><textarea id="t_'+cid+'_'+r.idx+'" class="'+(curEdited(r)?'ed':'')+'" rows="'+Math.max(3,Math.ceil(curText(r).length/95))+'" oninput="onEdit(\''+cid+'\','+r.idx+',this)">'+esc(curText(r))+'</textarea>'+
-      (state.mode==='short'?'<div class="cc" id="cc_'+cid+'_'+r.idx+'">'+ccLabel(curText(r))+'</div>':'')+'</td>'+
-    '<td><button class="rg" title="Otra redacción para este estudiante" onclick="regenRow(\''+cid+'\','+r.idx+')">🔄</button></td></tr>'
-  ).join('');
-  return '<details'+(open?' open':'')+'><summary>'+esc(c.label)+
-    '<span class="meta">'+d.rows.length+' estudiantes · Docente: '+esc(doc)+'</span><span class="chips">'+chips+'</span></summary>'+
-    '<div class="comps"><b>Competencias:</b> '+esc(c.comps.join(' · '))+'</div>'+
-    '<div class="tbl"><table><thead><tr><th style="width:36px">N°</th><th>Estudiante</th><th style="width:56px;text-align:center">Nota</th><th style="width:56px;text-align:center">Nivel</th><th>'+(state.mode==='short'?'Síntesis para SIAGIE':'Conclusión descriptiva')+'</th><th style="width:40px"></th></tr></thead><tbody>'+rows+'</tbody></table></div></details>';
+    '<td><textarea id="t_'+k+'" class="'+(curEdited(r,ck)?'ed':'')+'" rows="'+Math.max(3,Math.ceil(t.length/95))+'" oninput="onEdit('+q+',this)">'+esc(t)+'</textarea>'+
+      (state.mode==='short'?'<div class="cc" id="cc_'+k+'">'+ccLabel(t)+'</div>':'')+
+      '<div class="ai"><input type="text" id="h_'+k+'" class="hint" maxlength="200" value="'+esc(r.c[ck].hint)+'" placeholder="Indicación rápida: ej. le cuesta exponer, mejorar lectura, muy participativo..." oninput="setHint('+q+',this.value)" onkeydown="if(event.key===\'Enter\')improveAI('+q+')">'+
+      '<button class="btn-ai" id="b_'+k+'" onclick="improveAI('+q+')">✨ Mejorar con IA</button></div>'+
+      '<div class="aimsg" id="m_'+k+'"></div></td>'+
+    '<td><button class="rg" title="Otra redacción para este estudiante" onclick="regenRow('+q+')">🔄</button></td></tr>';
 }
-function curText(r){ return state.mode==='short'?r.short:r.text; }
-function curEdited(r){ return state.mode==='short'?r.editedShort:r.edited; }
-function ccLabel(t){ const n=t.length; return '<span style="color:'+(n>SIAGIE_MAX?'#9B1B1B':'#6B6258')+';font-weight:700">'+n+' / '+SIAGIE_MAX+' caracteres'+(n>SIAGIE_MAX?' — excede el límite de SIAGIE':'')+'</span>'; }
-function setMode(m){ state.mode=m; renderResults(); }
 function findRow(cid,idx){ return state.courses[cid].rows.find(r=>r.idx===idx); }
-function onEdit(cid,idx,el){
+function setHint(cid,ck,idx,v){ const r=findRow(cid,idx); if(r) r.c[ck].hint=v; }
+function onEdit(cid,ck,idx,el){
   const r=findRow(cid,idx); if(!r) return;
-  if(state.mode==='short'){ r.short=el.value; r.editedShort=true; const cc=$('cc_'+cid+'_'+idx); if(cc) cc.innerHTML=ccLabel(el.value); }
-  else { r.text=el.value; r.edited=true; }
+  if(state.mode==='short'){ r.c[ck].short=el.value; r.c[ck].edS=true; const cc=$('cc_'+cid+'_'+ck+'_'+idx); if(cc) cc.innerHTML=ccLabel(el.value); }
+  else { r.c[ck].text=el.value; r.c[ck].edF=true; }
   el.classList.add('ed');
   el.rows=Math.max(3,Math.ceil(el.value.length/95));
 }
-function regenRow(cid,idx){
+function refreshCell(cid,ck,idx){
+  const r=findRow(cid,idx), k=cid+'_'+ck+'_'+idx, el=$('t_'+k); if(!r||!el) return;
+  const t=curText(r,ck); el.value=t; el.classList.toggle('ed',curEdited(r,ck)); el.rows=Math.max(3,Math.ceil(t.length/95));
+  const cc=$('cc_'+k); if(cc) cc.innerHTML=ccLabel(t);
+}
+function regenRow(cid,ck,idx){
   const r=findRow(cid,idx); if(!r) return;
-  if(curEdited(r)&&!confirm('Este texto fue editado. ¿Reemplazarlo por una nueva redacción?')) return;
-  r.bump++;
-  if(state.mode==='short'){ r.editedShort=false; r.short=genShort(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump); }
-  else { r.edited=false; r.text=genText(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump); }
-  renderResults();
+  if(curEdited(r,ck)&&!confirm('Este texto fue editado. ¿Reemplazarlo por una nueva redacción?')) return;
+  const course=COURSE_BY_ID[cid], c=r.c[ck]; c.bump++;
+  if(state.mode==='short'){ c.edS=false; c.ai=false; c.short=genShort(course,ck,r.st,r.name,state.bim,c.bump,null); }
+  else { c.edF=false; c.text=genFull(course,ck,r.st,r.name,state.bim,c.bump,null); }
+  refreshCell(cid,ck,idx);
 }
 function regenAll(){
   let anyEdited=false;
-  Object.values(state.courses).forEach(c=>c.rows.forEach(r=>{ if(r.edited||r.editedShort) anyEdited=true; }));
+  Object.values(state.courses).forEach(c=>c.rows.forEach(r=>Object.values(r.c).forEach(x=>{ if(x.edF||x.edS) anyEdited=true; })));
   if(!confirm(anyEdited?'Hay textos editados que se perderán. ¿Generar una nueva redacción para todos?':'¿Generar una nueva redacción para todos los estudiantes?')) return;
-  Object.keys(state.courses).forEach(cid=>state.courses[cid].rows.forEach(r=>{
-    r.bump++; r.edited=false; r.editedShort=false; r.text=genText(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump); r.short=genShort(COURSE_BY_ID[cid],r.st,r.name,state.bim,r.bump);
-  }));
+  Object.keys(state.courses).forEach(cid=>{
+    const course=COURSE_BY_ID[cid], usedS={}, usedF={};
+    course.comps.forEach(k=>{usedS[k]=new Set();usedF[k]=new Set();});
+    state.courses[cid].rows.forEach(r=>course.comps.forEach(k=>{
+      const c=r.c[k]; c.bump++; c.edF=false; c.edS=false; c.ai=false;
+      c.text=genFull(course,k,r.st,r.name,state.bim,c.bump,usedF[k]);
+      c.short=genShort(course,k,r.st,r.name,state.bim,c.bump,usedS[k]);
+    }));
+  });
   renderResults();
 }
+
+// ----- Configuración de la clave de Google Gemini -----
+function openSettings(){
+  $('keyInput').value=''; $('keyMsg').textContent='';
+  $('keyState').textContent=getKey()?'✓ Hay una clave guardada en este navegador.':'Todavía no hay clave guardada. El generador automático funciona igual sin ella.';
+  $('modal').style.display='flex'; setTimeout(()=>$('keyInput').focus(),50);
+}
+function closeSettings(){ $('modal').style.display='none'; }
+function saveKey(){
+  const k=$('keyInput').value.trim();
+  if(!k){ $('keyMsg').textContent='Pega primero tu clave.'; return; }
+  if(!setKey(k)){ $('keyMsg').textContent='Tu navegador no permite guardar la clave.'; return; }
+  $('keyInput').value=''; $('keyState').textContent='✓ Clave guardada en este navegador.'; $('keyMsg').textContent='Listo. Ya puedes usar ✨ Mejorar con IA.';
+}
+function deleteKey(){ setKey(''); $('keyState').textContent='La clave fue eliminada de este navegador.'; $('keyMsg').textContent=''; }
+async function testKey(){
+  $('keyMsg').textContent='Probando conexión…';
+  try{ const t=await callGemini('Responde solo con la palabra: listo'); $('keyMsg').textContent='✓ Conexión correcta con Gemini ('+cleanAI(t).slice(0,30)+').'; }
+  catch(e){ $('keyMsg').textContent='❌ '+(e.message||e); }
+}
+
+// ----- Llamada a Google Gemini (gemini-2.5-flash) -----
+const GEMINI_URL='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+async function callGemini(prompt){
+  const key=getKey();
+  if(!key) throw new Error('Falta la clave de Google Gemini. Configúrala en el botón ⚙️ IA.');
+  let res;
+  try{
+    res=await fetch(GEMINI_URL,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],
+        generationConfig:{temperature:0.9,maxOutputTokens:512,thinkingConfig:{thinkingBudget:0}}})});
+  }catch(e){ throw new Error('No hay conexión con Google Gemini. Revisa tu internet.'); }
+  if(!res.ok){
+    let m=''; try{ const j=await res.json(); m=(j.error&&j.error.message)||''; }catch(e){}
+    if(res.status===400&&/API key/i.test(m)) throw new Error('La clave de Gemini no es válida. Revísala en ⚙️ IA.');
+    if(res.status===403) throw new Error('Gemini rechazó la clave (sin permiso). Revísala en ⚙️ IA.');
+    if(res.status===429) throw new Error('Se alcanzó el límite gratuito de Gemini. Espera un minuto e inténtalo de nuevo.');
+    throw new Error('Gemini respondió con error '+res.status+(m?': '+m.slice(0,120):''));
+  }
+  const data=await res.json();
+  const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
+  const t=parts.map(p=>p.text||'').join('');
+  if(!t.trim()) throw new Error('Gemini no devolvió texto. Inténtalo otra vez.');
+  return t;
+}
+// Pide el texto y verifica 315–340 caracteres; reintenta con corrección (máx. 4 intentos)
+async function geminiConclusion(data,onTry){
+  let base=buildPrompt(data), prompt=base, best=null, bestD=1e9;
+  for(let i=1;i<=4;i++){
+    if(onTry) onTry(i);
+    const t=cleanAI(await callGemini(prompt)), L=t.length;
+    if(L>=SIAGIE_MIN_OBJ&&L<=SIAGIE_MAX_OBJ) return {text:t,exact:true};
+    if(L<=SIAGIE_MAX&&L>0){ const d=Math.abs(L-327); if(d<bestD){bestD=d;best=t;} }
+    prompt=base+'\n\nTU INTENTO ANTERIOR TENÍA '+L+' CARACTERES: "'+t+'"\nReescríbelo cumpliendo exactamente entre 315 y 340 caracteres. '+(L>340?'Acórtalo.':'Amplíalo con más detalle del desempeño y la recomendación.')+' Devuelve solo el texto.';
+    if(i===4&&!best) best=trimToLimit(t,SIAGIE_MAX);
+  }
+  return {text:best,exact:false};
+}
+async function improveAI(cid,ck,idx){
+  const r=findRow(cid,idx); if(!r) return;
+  const k=cid+'_'+ck+'_'+idx;
+  if(!getKey()){ openSettings(); $('keyMsg').textContent='Primero guarda tu clave gratuita de Google AI Studio.'; return; }
+  if(state.mode!=='short') setMode('short');
+  const btn=$('b_'+k), msg=$('m_'+k); if(!btn) return;
+  const course=COURSE_BY_ID[cid], c=r.c[ck];
+  btn.disabled=true; btn.textContent='⏳ Generando…'; if(msg){ msg.textContent=''; msg.className='aimsg'; }
+  try{
+    const res=await geminiConclusion({grado:state.grado,curso:course.label,competencia:COMP[ck].name,nivel:r.nivel,nota:r.nota,
+      weeks:r.st.weeks,expAvg:r.st.expAvg,cp:r.st.cp,hint:c.hint},n=>{ if(msg&&n>1) msg.textContent='Ajustando la longitud (intento '+n+')…'; });
+    c.short=res.text; c.edS=true; c.ai=true;
+    refreshCell(cid,ck,idx);
+    const m2=$('m_'+k);
+    if(m2){ m2.className='aimsg '+(res.exact?'ok':'warn'); m2.textContent=res.exact?'✓ Texto mejorado con IA. Puedes seguir editándolo.':'⚠ La IA no logró 315–340 caracteres exactos; revisa y ajusta el texto manualmente.'; }
+  }catch(e){
+    const m2=$('m_'+k); if(m2){ m2.className='aimsg err'; m2.textContent='❌ '+(e.message||e); }
+  }finally{
+    const b2=$('b_'+k); if(b2){ b2.disabled=false; b2.textContent='✨ Mejorar con IA'; }
+  }
+}
+
+// ----- Excel -----
 async function exportExcel(){
   const f=$('courseFilter').value||'all';
   const ids=COURSES.filter(c=>state.courses[c.id]).map(c=>c.id).filter(i=>f==='all'||i===f);
   if(!ids.length){ alert('No hay datos para descargar'); return; }
   if(typeof ExcelJS==='undefined'){ alert('No se pudo cargar la librería de Excel. Revisa tu conexión y recarga la página.'); return; }
   const meta={grado:state.grado,seccion:state.seccion,bim:state.bim};
-  const courses=ids.map(cid=>({
-    label:COURSE_BY_ID[cid].label, comps:COURSE_BY_ID[cid].comps,
-    docente:state.assign[cid]||'', rows:state.courses[cid].rows
-  }));
+  const sheets=[];
+  ids.forEach(cid=>{
+    const c=COURSE_BY_ID[cid];
+    compsShown(cid).forEach(ck=>{
+      const n=c.comps.indexOf(ck)+1;
+      sheets.push({
+        sheet:c.comps.length>1?(c.label.slice(0,26)+' C'+n):c.label,
+        curso:c.label, competencia:(c.comps.length>1?'('+n+' de '+c.comps.length+') ':'')+COMP[ck].name,
+        docente:state.assign[cid]||'',
+        rows:state.courses[cid].rows.map(r=>({name:r.name,nota:r.nota,nivel:r.nivel,text:r.c[ck].text,short:r.c[ck].short}))
+      });
+    });
+  });
   try{
-    const wb=buildWorkbook(ExcelJS,meta,courses);
+    const wb=buildWorkbook(ExcelJS,meta,sheets);
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const clean=s=>String(s).replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ]+/g,'_').replace(/^_|_$/g,'');
-    const fname='Conclusiones_'+clean(meta.grado)+'_'+clean(meta.seccion)+'_Bim'+meta.bim+(f==='all'?'':'_'+clean(COURSE_BY_ID[f].label))+'.xlsx';
+    const cf=$('compFilter').value||'all';
+    const suffix=f==='all'?'':'_'+clean(COURSE_BY_ID[f].label)+((cf!=='all'&&COMP[cf])?'_Comp'+(COURSE_BY_ID[f].comps.indexOf(cf)+1):'');
+    const fname='Conclusiones_'+clean(meta.grado)+'_'+clean(meta.seccion)+'_Bim'+meta.bim+suffix+'.xlsx';
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
