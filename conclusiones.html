@@ -65,6 +65,7 @@ textarea.ed{background:#FFFBEB;border-color:#F59E0B;}
 .rg{border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:4px 7px;font-size:13px;}
 .rg:hover{background:#EFF6FF;}
 .cc{font-size:11px;margin-top:3px;}
+.csel{width:150px;max-width:150px;border:1.5px solid var(--line);border-radius:8px;padding:5px;font-size:11px;font-family:inherit;background:#fff;}
 .ai{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
 .hint{flex:1;min-width:220px;border:1.5px dashed var(--line);border-radius:8px;padding:6px 9px;font-size:12px;font-family:inherit;}
 .hint:focus{outline:none;border-color:#7C3AED;}
@@ -113,9 +114,10 @@ textarea.ed{background:#FFFBEB;border-color:#F59E0B;}
       </div>
     </div>
     <div id="status"></div>
-    <div class="note">Las conclusiones se generan solas, <b>una por cada competencia</b> del curso, a partir de las notas del registro (semanas, exposiciones y comportamiento, con el mismo cálculo del LOGRO; si el Director puso una nota manual, se usa esa). No se toma en cuenta el libro ni la evaluación bimestral. Son un <b>borrador</b>: cada docente debe revisarlas y ajustarlas. Con <b>✨ Mejorar con IA</b> (Google Gemini) puedes reescribir una conclusión; solo se envían el curso, la competencia, el nivel y las notas, <b>nunca el nombre del estudiante</b>. <b>Las ediciones que hagas aquí no se guardan</b>: descarga el Excel antes de cambiar de grado, sección o bimestre.</div>
+    <div class="note">Las conclusiones se generan solas. Por defecto es <b>una por estudiante</b>, y la competencia que se trabaja en cada una se reparte <b>al azar</b> (de forma equilibrada) entre los estudiantes del curso; también puedes cambiarla en cada fila o pasar a «Una por cada competencia», a partir de las notas del registro (semanas, exposiciones y comportamiento, con el mismo cálculo del LOGRO; si el Director puso una nota manual, se usa esa). No se toma en cuenta el libro ni la evaluación bimestral. Son un <b>borrador</b>: cada docente debe revisarlas y ajustarlas. Con <b>✨ Mejorar con IA</b> (Google Gemini) puedes reescribir una conclusión; solo se envían el curso, la competencia, el nivel y las notas, <b>nunca el nombre del estudiante</b>. <b>Las ediciones que hagas aquí no se guardan</b>: descarga el Excel antes de cambiar de grado, sección o bimestre.</div>
     <div class="bar" id="bar" style="display:none">
       <div class="f"><label>Curso</label><select id="courseFilter" onchange="onCourseChange()"></select></div>
+      <div class="f" style="min-width:250px"><label>Organizar conclusiones</label><select id="viewSel" onchange="setView(this.value)"><option value="azar">Una por estudiante (competencia al azar)</option><option value="comp">Una por cada competencia</option></select></div>
       <div class="f" id="compWrap" style="min-width:280px;display:none"><label>Competencia</label><select id="compFilter" onchange="renderResults()"></select></div>
       <div class="f" style="min-width:200px"><label>Ver versión</label><select id="modeSel" onchange="setMode(this.value)"><option value="short">Para SIAGIE (máx. 350 car.)</option><option value="full">Completa</option></select></div>
       <button class="btn green" id="btnXls" onclick="exportExcel()">⬇ Descargar Excel</button>
@@ -543,6 +545,17 @@ function genFull(course,ck,st,name,bim,bump,used){
   if(used) used.add(t);
   return t;
 }
+// Reparto aleatorio y equilibrado: a cada estudiante se le asigna UNA competencia del curso.
+// Cada competencia recibe casi la misma cantidad de estudiantes; el orden es al azar (y estable para el mismo bimestre).
+function assignComps(course,rows,bim,seedBump){
+  const n=course.comps.length;
+  if(n===1){ rows.forEach(r=>{r.pick=course.comps[0];}); return; }
+  const rng=mulberry32((hashStr(course.id+'|'+bim+'|'+rows.length+'|azar')+(seedBump||0)*7919)>>>0);
+  const order=rows.map((_,i)=>i);
+  for(let i=order.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); const t=order[i]; order[i]=order[j]; order[j]=t; }
+  const offset=Math.floor(rng()*n);
+  order.forEach((ri,pos)=>{ rows[ri].pick=course.comps[(pos+offset)%n]; });
+}
 function buildCourseRows(course,snap,names,comp,overrides,bim){
   const rows=[]; const usedS={},usedF={};
   course.comps.forEach(k=>{usedS[k]=new Set();usedF[k]=new Set();});
@@ -556,8 +569,9 @@ function buildCourseRows(course,snap,names,comp,overrides,bim){
       c[k]={bump:0,edF:false,edS:false,hint:'',ai:false,
         text:genFull(course,k,st,nm,bim,0,usedF[k]),short:genShort(course,k,st,nm,bim,0,usedS[k])};
     });
-    rows.push({idx,name:nm,st,nota:st.notaInt,nivel:st.nivel,manual:st.manual,c});
+    rows.push({idx,name:nm,st,nota:st.notaInt,nivel:st.nivel,manual:st.manual,c,pick:course.comps[0]});
   }
+  assignComps(course,rows,bim,0);
   return rows;
 }
 
@@ -624,9 +638,10 @@ function buildWorkbook(ExcelJS,meta,sheets){
       views:[{state:'frozen',ySplit:5}],
       pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}
     });
-    ws.columns=[{width:5},{width:34},{width:7},{width:8},{width:80},{width:58},{width:11}];
+    const PS=!!c.perStudent, NC=PS?8:7, LASTC=PS?'H':'G';
+    ws.columns=PS?[{width:5},{width:34},{width:7},{width:8},{width:34},{width:70},{width:52},{width:11}]:[{width:5},{width:34},{width:7},{width:8},{width:80},{width:58},{width:11}];
     const line=(r,text,opt)=>{
-      ws.mergeCells('A'+r+':G'+r);
+      ws.mergeCells('A'+r+':'+LASTC+r);
       const cell=ws.getCell('A'+r); cell.value=text;
       cell.font=Object.assign({name:'Calibri',size:11},opt.font||{});
       cell.alignment={vertical:'middle',wrapText:true};
@@ -634,14 +649,14 @@ function buildWorkbook(ExcelJS,meta,sheets){
     };
     line(1,'I.E.P. «La Nueva Esperanza» — La Oroya   |   Conclusiones descriptivas — '+c.curso+'   |   '+meta.grado+' · Sección '+meta.seccion+' · Bimestre '+meta.bim,{font:{bold:true,size:12,color:{argb:'FF1A4E9A'}},h:24});
     line(2,'Docente: '+(c.docente||'—'),{font:{bold:true},h:18});
-    line(3,'Competencia (CNEB): '+c.competencia,{font:{size:10,bold:true},h:30});
+    line(3,PS?('Competencias del curso (CNEB): '+c.competencia):('Competencia (CNEB): '+c.competencia),{font:{size:10,bold:PS?false:true},h:PS?44:30});
     line(4,'Redacción generada a partir de las notas del registro. El docente debe revisarla y ajustarla antes de su uso oficial. La síntesis para SIAGIE admite un máximo de 350 caracteres.',{font:{italic:true,size:9,color:{argb:'FF6B6258'}},h:16});
     const hr=ws.getRow(5);
-    ['N°','Apellidos y nombres','Nota','Nivel','Conclusión descriptiva (completa)','Síntesis para SIAGIE (máx. 350 car.)','N° de caracteres'].forEach((t,i)=>{
+    (PS?['N°','Apellidos y nombres','Nota','Nivel','Competencia evaluada','Conclusión descriptiva (completa)','Síntesis para SIAGIE (máx. 350 car.)','N° de caracteres']:['N°','Apellidos y nombres','Nota','Nivel','Conclusión descriptiva (completa)','Síntesis para SIAGIE (máx. 350 car.)','N° de caracteres']).forEach((t,i)=>{
       const cell=hr.getCell(i+1); cell.value=t;
       cell.font={bold:true,color:{argb:'FFFFFFFF'},name:'Calibri',size:11};
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A4E9A'}};
-      cell.alignment={vertical:'middle',wrapText:true,horizontal:(i===4||i===5||i===1)?'left':'center'};
+      cell.alignment={vertical:'middle',wrapText:true,horizontal:(i===1||i>=4&&i<NC-1)?'left':'center'};
       cell.border=border;
     });
     hr.height=30;
@@ -651,14 +666,17 @@ function buildWorkbook(ExcelJS,meta,sheets){
       row.getCell(2).value=r.name;
       row.getCell(3).value=r.nota;
       row.getCell(4).value=r.nivel;
-      row.getCell(5).value=r.text;
-      row.getCell(6).value=r.short||'';
-      row.getCell(7).value={formula:'LEN(F'+(6+i)+')',result:(r.short||'').length};
-      for(let col=1;col<=7;col++){
+      let o=5;
+      if(PS){ row.getCell(5).value=r.compName||''; o=6; }
+      row.getCell(o).value=r.text;
+      row.getCell(o+1).value=r.short||'';
+      const L=String.fromCharCode(64+o+1);
+      row.getCell(o+2).value={formula:'LEN('+L+(6+i)+')',result:(r.short||'').length};
+      for(let col=1;col<=NC;col++){
         const cell=row.getCell(col);
         cell.border=border;
-        cell.font={name:'Calibri',size:(col===5||col===6)?10:11,bold:col===2||col===3||col===4};
-        cell.alignment={vertical:'top',wrapText:true,horizontal:(col===1||col===3||col===4||col===7)?'center':'left'};
+        cell.font={name:'Calibri',size:(col>=5&&col<NC)?10:11,bold:col===2||col===3||col===4};
+        cell.alignment={vertical:'top',wrapText:true,horizontal:(col===1||col===3||col===4||col===NC)?'center':'left'};
       }
       if(FILL[r.nivel]){
         row.getCell(3).fill={type:'pattern',pattern:'solid',fgColor:{argb:FILL[r.nivel]}};
@@ -673,7 +691,7 @@ function buildWorkbook(ExcelJS,meta,sheets){
 
 // ======================= Pantalla =======================
 const $=id=>document.getElementById(id);
-const state={mode:'short',user:null,bim:'I',grado:'',seccion:'',names:[],courses:{},assign:{}};
+const state={view:'azar',mode:'short',user:null,bim:'I',grado:'',seccion:'',names:[],courses:{},assign:{}};
 const GKEY='lne_gemini_key';
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function pj(s){try{return JSON.parse(s)||{};}catch(e){return {};}}
@@ -787,7 +805,7 @@ async function loadAll(){
     syncCompFilter();
     $('bar').style.display='flex';
     renderResults();
-    setStatus('✓ '+total+' conclusiones (por competencia) en '+ids.length+' cursos. Revisa o edita los textos y descarga el Excel.');
+    updateStatus();
   }catch(e){
     console.error(e); setStatus('❌ No se pudo cargar: '+(e.message||e),true);
   }finally{ $('btnLoad').disabled=false; }
@@ -797,16 +815,17 @@ async function loadAll(){
 function onCourseChange(){ syncCompFilter(); renderResults(); }
 function syncCompFilter(){
   const f=$('courseFilter').value||'all', w=$('compWrap'), sel=$('compFilter');
-  if(f!=='all'&&COURSE_BY_ID[f]&&COURSE_BY_ID[f].comps.length>1){
+  if(state.view==='comp'&&f!=='all'&&COURSE_BY_ID[f]&&COURSE_BY_ID[f].comps.length>1){
     const c=COURSE_BY_ID[f];
     sel.innerHTML='<option value="all">Todas las competencias ('+c.comps.length+', separadas)</option>'+
       c.comps.map((k,i)=>'<option value="'+k+'">Competencia '+(i+1)+': '+esc(COMP[k].name)+'</option>').join('');
     w.style.display='block';
   } else { sel.innerHTML='<option value="all">Todas</option>'; w.style.display='none'; }
 }
+function setView(v){ state.view=v; $('viewSel').value=v; syncCompFilter(); renderResults(); updateStatus(); }
 function compsShown(cid){
   const c=COURSE_BY_ID[cid], f=$('courseFilter').value||'all', cf=$('compFilter').value||'all';
-  if(f===cid&&cf!=='all'&&c.comps.includes(cf)) return [cf];
+  if(state.view==='comp'&&f===cid&&cf!=='all'&&c.comps.includes(cf)) return [cf];
   return c.comps;
 }
 function curText(r,ck){ return state.mode==='short'?r.c[ck].short:r.c[ck].text; }
@@ -815,6 +834,12 @@ function ccLabel(t){ const n=t.length; const bad=n>SIAGIE_MAX, warn=n<SIAGIE_MIN
   return '<span style="color:'+(bad?'#9B1B1B':warn?'#B45309':'#1D6F42')+';font-weight:700">'+n+' / '+SIAGIE_MAX+' caracteres'+(bad?' — excede el límite de SIAGIE':'')+'</span>'; }
 function setMode(m){ state.mode=m; $('modeSel').value=m; renderResults(); }
 
+function updateStatus(){
+  const ids=COURSES.filter(c=>state.courses[c.id]);
+  if(!ids.length) return;
+  let total=0; ids.forEach(c=>{ total+=state.courses[c.id].rows.length*(state.view==='azar'?1:c.comps.length); });
+  setStatus('✓ '+total+' conclusiones ('+(state.view==='azar'?'una por estudiante, con la competencia repartida al azar':'una por cada competencia')+') en '+ids.length+' cursos. Revisa o edita los textos y descarga el Excel.');
+}
 function renderResults(){
   const cont=$('results');
   const ids=COURSES.filter(c=>state.courses[c.id]).map(c=>c.id);
@@ -822,7 +847,7 @@ function renderResults(){
   const f=$('courseFilter').value||'all';
   const show=f==='all'?ids:ids.filter(i=>i===f);
   const cf=$('compFilter').value||'all';
-  $('btnXls').textContent=f==='all'?'⬇ Descargar Excel (todos los cursos)':('⬇ Descargar Excel ('+COURSE_BY_ID[f].label+(cf!=='all'&&COMP[cf]?' · 1 competencia':'')+')');
+  $('btnXls').textContent=f==='all'?'⬇ Descargar Excel (todos los cursos)':('⬇ Descargar Excel ('+COURSE_BY_ID[f].label+(state.view==='comp'&&cf!=='all'&&COMP[cf]?' · 1 competencia':'')+')');
   cont.innerHTML=show.map(cid=>courseBlock(cid,f!=='all')).join('');
 }
 function courseBlock(cid,open){
@@ -831,6 +856,16 @@ function courseBlock(cid,open){
   d.rows.forEach(r=>{ if(cnt[r.nivel]!==undefined) cnt[r.nivel]++; });
   const doc=state.assign[cid]||'sin docente asignado';
   const chips=['AD','A','B','C'].map(l=>cnt[l]?'<span class="lv lv'+l+'">'+l+' '+cnt[l]+'</span>':'').join('');
+  if(state.view==='azar'){
+    const leg=c.comps.map((k,i)=>'<b>C'+(i+1)+'</b> '+esc(COMP[k].name)).join(' · ');
+    const rowsA=d.rows.map((r,i)=>rowHtml(cid,r.pick,r,i,true)).join('');
+    const nsel=c.comps.map(k=>d.rows.filter(r=>r.pick===k).length);
+    const reparto=c.comps.length>1?' · Reparto: '+c.comps.map((k,i)=>'C'+(i+1)+'='+nsel[i]).join(', '):'';
+    return '<details'+(open?' open':'')+'><summary>'+esc(c.label)+
+      '<span class="meta">'+d.rows.length+' estudiantes · '+c.comps.length+' competencia'+(c.comps.length>1?'s':'')+reparto+' · Docente: '+esc(doc)+'</span><span class="chips">'+chips+'</span></summary>'+
+      '<div class="comps"><b>Competencias del curso:</b> '+leg+'</div>'+
+      '<div class="tbl"><table><thead><tr><th style="width:36px">N°</th><th>Estudiante</th><th style="width:56px;text-align:center">Nota</th><th style="width:56px;text-align:center">Nivel</th><th style="width:150px">Competencia evaluada</th><th>'+(state.mode==='short'?'Síntesis para SIAGIE':'Conclusión descriptiva (completa)')+'</th><th style="width:40px"></th></tr></thead><tbody>'+rowsA+'</tbody></table></div></details>';
+  }
   const shown=compsShown(cid);
   const tables=shown.map(ck=>{
     const idxN=c.comps.indexOf(ck)+1;
@@ -841,11 +876,12 @@ function courseBlock(cid,open){
   return '<details'+(open?' open':'')+'><summary>'+esc(c.label)+
     '<span class="meta">'+d.rows.length+' estudiantes · '+c.comps.length+' competencia'+(c.comps.length>1?'s':'')+' · Docente: '+esc(doc)+'</span><span class="chips">'+chips+'</span></summary>'+tables+'</details>';
 }
-function rowHtml(cid,ck,r,i){
+function rowHtml(cid,ck,r,i,azar){
   const k=cid+'_'+ck+'_'+r.idx, t=curText(r,ck), q="'"+cid+"','"+ck+"',"+r.idx;
   return '<tr><td class="num">'+(i+1)+'</td><td class="nm">'+esc(r.name)+'</td>'+
     '<td class="num">'+r.nota+(r.manual?'<span class="star" title="Nota manual del Director">*</span>':'')+'</td>'+
     '<td class="num"><span class="lv lv'+r.nivel+'">'+r.nivel+'</span></td>'+
+    (azar?'<td><select class="csel" title="'+esc(COMP[ck].name)+'" onchange="setPick(\''+cid+'\','+r.idx+',this.value)">'+COURSE_BY_ID[cid].comps.map((kk,ii)=>'<option value="'+kk+'"'+(kk===ck?' selected':'')+'>C'+(ii+1)+' · '+esc(COMP[kk].name)+'</option>').join('')+'</select></td>':'')+
     '<td><textarea id="t_'+k+'" class="'+(curEdited(r,ck)?'ed':'')+'" rows="'+Math.max(3,Math.ceil(t.length/95))+'" oninput="onEdit('+q+',this)">'+esc(t)+'</textarea>'+
       (state.mode==='short'?'<div class="cc" id="cc_'+k+'">'+ccLabel(t)+'</div>':'')+
       '<div class="ai"><input type="text" id="h_'+k+'" class="hint" maxlength="200" value="'+esc(r.c[ck].hint)+'" placeholder="Indicación rápida: ej. le cuesta exponer, mejorar lectura, muy participativo..." oninput="setHint('+q+',this.value)" onkeydown="if(event.key===\'Enter\')improveAI('+q+')">'+
@@ -853,6 +889,7 @@ function rowHtml(cid,ck,r,i){
       '<div class="aimsg" id="m_'+k+'"></div></td>'+
     '<td><button class="rg" title="Otra redacción para este estudiante" onclick="regenRow('+q+')">🔄</button></td></tr>';
 }
+function setPick(cid,idx,ck){ const r=findRow(cid,idx); if(!r) return; r.pick=ck; renderResults(); }
 function findRow(cid,idx){ return state.courses[cid].rows.find(r=>r.idx===idx); }
 function setHint(cid,ck,idx,v){ const r=findRow(cid,idx); if(r) r.c[ck].hint=v; }
 function onEdit(cid,ck,idx,el){
@@ -882,6 +919,7 @@ function regenAll(){
   Object.keys(state.courses).forEach(cid=>{
     const course=COURSE_BY_ID[cid], usedS={}, usedF={};
     course.comps.forEach(k=>{usedS[k]=new Set();usedF[k]=new Set();});
+    state.shuffle=(state.shuffle||0)+1; assignComps(course,state.courses[cid].rows,state.bim,state.shuffle);
     state.courses[cid].rows.forEach(r=>course.comps.forEach(k=>{
       const c=r.c[k]; c.bump++; c.edF=false; c.edS=false; c.ai=false;
       c.text=genFull(course,k,r.st,r.name,state.bim,c.bump,usedF[k]);
@@ -980,6 +1018,12 @@ async function exportExcel(){
   const sheets=[];
   ids.forEach(cid=>{
     const c=COURSE_BY_ID[cid];
+    if(state.view==='azar'){
+      sheets.push({sheet:c.label,curso:c.label,perStudent:true,docente:state.assign[cid]||'',
+        competencia:c.comps.map((k,i)=>'C'+(i+1)+': '+COMP[k].name).join(' · '),
+        rows:state.courses[cid].rows.map(r=>({name:r.name,nota:r.nota,nivel:r.nivel,compName:COMP[r.pick].name,text:r.c[r.pick].text,short:r.c[r.pick].short}))});
+      return;
+    }
     compsShown(cid).forEach(ck=>{
       const n=c.comps.indexOf(ck)+1;
       sheets.push({
@@ -996,7 +1040,7 @@ async function exportExcel(){
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const clean=s=>String(s).replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ]+/g,'_').replace(/^_|_$/g,'');
     const cf=$('compFilter').value||'all';
-    const suffix=f==='all'?'':'_'+clean(COURSE_BY_ID[f].label)+((cf!=='all'&&COMP[cf])?'_Comp'+(COURSE_BY_ID[f].comps.indexOf(cf)+1):'');
+    const suffix=f==='all'?'':'_'+clean(COURSE_BY_ID[f].label)+((state.view==='comp'&&cf!=='all'&&COMP[cf])?'_Comp'+(COURSE_BY_ID[f].comps.indexOf(cf)+1):'');
     const fname='Conclusiones_'+clean(meta.grado)+'_'+clean(meta.seccion)+'_Bim'+meta.bim+suffix+'.xlsx';
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname;
     document.body.appendChild(a); a.click(); a.remove();
